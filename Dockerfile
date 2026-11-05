@@ -10,8 +10,10 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs && echo "" > src/lib.rs && \
     cargo build --release && \
     rm -rf src
 
-# Copy real source code and migrations
+# Copy real source code, templates, public assets and migrations
 COPY src ./src
+COPY templates ./templates
+COPY public ./public
 COPY migrations ./migrations
 
 # Touch files to force rebuild of real code
@@ -23,10 +25,10 @@ FROM debian:bookworm-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/template-rust /app/server
+COPY --from=builder /app/target/release/exavault /app/server
 COPY migrations ./migrations
 COPY .env.example ./.env
 
 EXPOSE 8080
-CMD ["/app/server"]
+CMD ["/app/server", "serve"]
 

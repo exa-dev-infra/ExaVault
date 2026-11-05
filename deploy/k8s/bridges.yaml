@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-http-proxy
+  namespace: exavault
+spec:
+  type: ExternalName
+  externalName: keda-add-ons-http-interceptor-proxy.keda.svc.cluster.local
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: proxy
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: exavault
+spec:
+  type: ExternalName
+  externalName: postgres-service.database.svc.cluster.local
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
