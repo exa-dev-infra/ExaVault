@@ -48,7 +48,7 @@ impl VaultService {
         let slug = slug.trim_matches('-').to_string();
 
         self.repo
-            .create_project(name, &slug, req.description.as_deref())
+            .create_project(name, &slug, req.description.as_deref(), req.group_name.as_deref())
             .await
     }
 

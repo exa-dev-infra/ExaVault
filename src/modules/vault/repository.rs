@@ -24,7 +24,7 @@ impl VaultRepository {
 
     pub async fn list_projects(&self) -> Result<Vec<ProjectWithEnvironments>, AppError> {
         let projects: Vec<Project> = sqlx::query_as(
-            "SELECT id, name, slug, description, created_at FROM projects ORDER BY created_at ASC"
+            "SELECT id, name, slug, description, group_name, created_at FROM projects ORDER BY COALESCE(group_name, '') ASC, name ASC"
         )
         .fetch_all(&self.pool)
         .await
@@ -54,15 +54,17 @@ impl VaultRepository {
         name: &str,
         slug: &str,
         description: Option<&str>,
+        group_name: Option<&str>,
     ) -> Result<ProjectWithEnvironments, AppError> {
         let mut tx = self.pool.begin().await.map_err(AppError::Database)?;
 
         let project: Project = sqlx::query_as(
-            "INSERT INTO projects (name, slug, description) VALUES ($1, $2, $3) RETURNING id, name, slug, description, created_at"
+            "INSERT INTO projects (name, slug, description, group_name) VALUES ($1, $2, $3, $4) RETURNING id, name, slug, description, group_name, created_at"
         )
         .bind(name)
         .bind(slug)
         .bind(description)
+        .bind(group_name)
         .fetch_one(&mut *tx)
         .await
         .map_err(AppError::Database)?;

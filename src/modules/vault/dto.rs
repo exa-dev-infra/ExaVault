@@ -9,6 +9,7 @@ pub struct Project {
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
+    pub group_name: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -78,6 +79,7 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub slug: Option<String>,
     pub description: Option<String>,
+    pub group_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

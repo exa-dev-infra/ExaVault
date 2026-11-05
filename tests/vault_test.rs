@@ -36,11 +36,18 @@ async fn test_project_creation_and_auto_seed_environments() {
         name: "Test Automation Project".to_string(),
         slug: Some(slug.clone()),
         description: Some("Automated test project".to_string()),
+        group_name: Some("Ecosystem Coffe".to_string()),
     };
 
     let created = service.create_project(req).await.expect("Failed to create project");
     assert_eq!(created.project.name, "Test Automation Project");
     assert_eq!(created.project.slug, slug);
+    assert_eq!(created.project.group_name.as_deref(), Some("Ecosystem Coffe"));
+
+    // Verify in list_projects
+    let projs = service.list_projects().await.expect("Failed to list projects");
+    let found = projs.iter().find(|p| p.project.id == created.project.id).expect("Project not found in list");
+    assert_eq!(found.project.group_name.as_deref(), Some("Ecosystem Coffe"));
 
     // Environments dev, staging, prod must be auto-seeded
     assert_eq!(created.environments.len(), 3);
@@ -82,6 +89,7 @@ async fn test_bulk_upsert_and_export_formats() {
             name: "Export Test".to_string(),
             slug: Some(proj_slug),
             description: None,
+            group_name: None,
         })
         .await
         .unwrap();

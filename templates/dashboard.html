@@ -24,26 +24,36 @@
                 <button @click="open = !open"
                         class="flex items-center gap-2 bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
                     <span class="text-zinc-400 text-xs">Project:</span>
-                    <span class="text-zinc-100" x-text="currentProject ? currentProject.name : 'Select Project'"></span>
+                    <span class="text-zinc-100 font-semibold" x-text="currentProject ? (currentProject.group_name ? `${currentProject.group_name} / ${currentProject.name}` : currentProject.name) : 'Select Project'"></span>
                     <span class="text-zinc-500 text-xs">▼</span>
                 </button>
 
                 <div x-show="open" @click.away="open = false"
-                     class="absolute top-full left-0 mt-2 w-64 bg-dark-900 border border-dark-800 rounded-xl shadow-2xl p-1.5 z-40">
-                    <div class="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Projects</div>
-                    <template x-for="p in projects" :key="p.id">
-                        <button @click="selectProject(p); open = false"
-                                class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between hover:bg-dark-800 transition-colors"
-                                :class="currentProject && currentProject.id === p.id ? 'bg-dark-800 text-brand-400 font-medium' : 'text-zinc-300'">
-                            <span x-text="p.name"></span>
-                            <span class="text-xs text-zinc-500" x-text="p.slug"></span>
-                        </button>
+                     class="absolute top-full left-0 mt-2 w-72 bg-dark-900 border border-dark-800 rounded-xl shadow-2xl p-2 z-40 max-h-96 overflow-y-auto">
+                    <div class="px-2 py-1 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Ecosystems & Projects</div>
+                    <template x-for="(groupList, groupTitle) in groupedProjects" :key="groupTitle">
+                        <div class="mb-2">
+                            <div class="px-2 py-1 text-[11px] font-semibold text-brand-400 flex items-center gap-1.5">
+                                <span>📁</span>
+                                <span x-text="groupTitle"></span>
+                            </div>
+                            <div class="pl-2 space-y-0.5">
+                                <template x-for="p in groupList" :key="p.id">
+                                    <button @click="selectProject(p); open = false"
+                                            class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-dark-800 transition-colors"
+                                            :class="currentProject && currentProject.id === p.id ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-300'">
+                                        <span x-text="p.name"></span>
+                                        <span class="text-[10px] text-zinc-500 font-mono" x-text="p.slug"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
                     </template>
                     <div class="border-t border-dark-800 my-1"></div>
                     <button @click="showNewProjectModal = true; open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm text-brand-400 hover:bg-dark-800 flex items-center gap-2 transition-colors">
+                            class="w-full text-left px-2.5 py-2 rounded-lg text-xs text-brand-400 hover:bg-dark-800 flex items-center gap-2 transition-colors font-medium">
                         <span>＋</span>
-                        <span>Create New Project</span>
+                        <span>Create New App / Project</span>
                     </button>
                 </div>
             </div>
@@ -352,34 +362,70 @@
             </div>
 
             <!-- Ready-to-copy Snippets -->
-            <div class="flex flex-col gap-3 pt-2 border-t border-dark-800">
-                <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Ready Integration Snippets</h4>
+            <div class="flex flex-col gap-3 pt-2 border-t border-dark-800" x-data="{ activeTab: 'curl' }">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Ready Integration Snippets</h4>
+                    <!-- Tabs -->
+                    <div class="flex items-center gap-1 bg-dark-950 p-0.5 rounded-lg border border-dark-800 text-[11px]">
+                        <button type="button" @click="activeTab = 'curl'"
+                                :class="activeTab === 'curl' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                                class="px-2 py-0.5 rounded transition-colors">cURL</button>
+                        <button type="button" @click="activeTab = 'github'"
+                                :class="activeTab === 'github' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                                class="px-2 py-0.5 rounded transition-colors">GitHub Actions</button>
+                        <button type="button" @click="activeTab = 'gitlab'"
+                                :class="activeTab === 'gitlab' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                                class="px-2 py-0.5 rounded transition-colors">GitLab CI</button>
+                        <button type="button" @click="activeTab = 'mcp'"
+                                :class="activeTab === 'mcp' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                                class="px-2 py-0.5 rounded transition-colors">AI MCP</button>
+                    </div>
+                </div>
                 
-                <!-- Snippet 1: curl to .env -->
-                <div>
-                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                        <span>Direct file pull (CI/CD / New PC):</span>
-                        <button @click="copyToClipboard(getCurlFileSnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
+                <!-- Tab 1: cURL / Bash -->
+                <div x-show="activeTab === 'curl'" class="space-y-2.5">
+                    <div>
+                        <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <span>Direct file pull (save as <code>.env</code>):</span>
+                            <button @click="copyToClipboard(getCurlFileSnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
+                        </div>
+                        <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlFileSnippet()"></pre>
                     </div>
-                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlFileSnippet()"></pre>
+
+                    <div>
+                        <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <span>In-memory process injection (no file written to disk):</span>
+                            <button @click="copyToClipboard(getCurlMemorySnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
+                        </div>
+                        <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlMemorySnippet()"></pre>
+                    </div>
                 </div>
 
-                <!-- Snippet 2: memory injection -->
-                <div>
-                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                        <span>Process memory injection:</span>
-                        <button @click="copyToClipboard(getCurlMemorySnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
+                <!-- Tab 2: GitHub Actions -->
+                <div x-show="activeTab === 'github'" class="space-y-1.5">
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400">
+                        <span>Save in Repo Settings &rarr; Secrets &rarr; <code>EXAVAULT_TOKEN</code></span>
+                        <button @click="copyToClipboard(getGithubActionsSnippet(), 'GitHub Actions YAML copied!')" class="text-brand-400 hover:underline">Copy YAML</button>
                     </div>
-                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlMemorySnippet()"></pre>
+                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getGithubActionsSnippet()"></pre>
                 </div>
 
-                <!-- Snippet 3: MCP config for AI assistant -->
-                <div>
-                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                        <span>Antigravity / Cursor MCP config snippet:</span>
-                        <button @click="copyToClipboard(getMcpSnippet(), 'MCP config copied!')" class="text-brand-400 hover:underline">Copy</button>
+                <!-- Tab 3: GitLab CI/CD -->
+                <div x-show="activeTab === 'gitlab'" class="space-y-1.5">
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400">
+                        <span>Save in Settings &rarr; CI/CD &rarr; Variables &rarr; <code>EXAVAULT_TOKEN</code> (Masked)</span>
+                        <button @click="copyToClipboard(getGitlabCiSnippet(), 'GitLab CI snippet copied!')" class="text-brand-400 hover:underline">Copy YAML</button>
                     </div>
-                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getMcpSnippet()"></pre>
+                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getGitlabCiSnippet()"></pre>
+                </div>
+
+                <!-- Tab 4: AI MCP Assistant -->
+                <div x-show="activeTab === 'mcp'" class="space-y-1.5">
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400">
+                        <span>Antigravity / Cursor / Claude Code (<code>mcpServers</code> config):</span>
+                        <button @click="copyToClipboard(getMcpSnippet(), 'MCP config copied!')" class="text-brand-400 hover:underline">Copy JSON</button>
+                    </div>
+                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getMcpSnippet()"></pre>
                 </div>
             </div>
 
@@ -396,24 +442,31 @@
     <div x-show="showNewProjectModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div @click.away="showNewProjectModal = false"
              class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
-            <h3 class="font-bold text-white text-base">Create New Project</h3>
+            <h3 class="font-bold text-white text-base">Create New App / Project</h3>
             
             <form @submit.prevent="createProject" class="space-y-3.5">
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">Project Name</label>
-                    <input type="text" x-model="newProjectForm.name" required placeholder="e.g. Cyber Mobile"
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">Ecosystem / Group Name (optional)</label>
+                    <input type="text" x-model="newProjectForm.group_name" placeholder="e.g. Coffe, Cyber, ExaBill"
+                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                    <p class="text-[10px] text-zinc-500 mt-1">Group microservices under an umbrella ecosystem (e.g. <code>Coffe</code> &rarr; <code>fe</code>, <code>master data</code>).</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">App / Service Name</label>
+                    <input type="text" x-model="newProjectForm.name" required placeholder="e.g. FE POS or Master Data"
                            class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-zinc-300 mb-1">Slug (optional)</label>
-                    <input type="text" x-model="newProjectForm.slug" placeholder="e.g. cyber-mobile"
+                    <input type="text" x-model="newProjectForm.slug" placeholder="e.g. fe-pos"
                            class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-zinc-300 mb-1">Description (optional)</label>
-                    <textarea x-model="newProjectForm.description" rows="2" placeholder="Brief project description"
+                    <textarea x-model="newProjectForm.description" rows="2" placeholder="Brief service description"
                               class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500"></textarea>
                 </div>
 
@@ -458,10 +511,22 @@ function vaultApp() {
         newTokenName: '',
         newTokenDays: '30',
         newlyCreatedToken: '',
-        newProjectForm: { name: '', slug: '', description: '' },
+        newProjectForm: { name: '', slug: '', description: '', group_name: '' },
 
         async initApp() {
             await this.loadProjects();
+        },
+
+        get groupedProjects() {
+            const groups = {};
+            for (const p of this.projects) {
+                const group = (p.group_name && p.group_name.trim()) ? p.group_name.trim() : 'Standalone / General';
+                if (!groups[group]) {
+                    groups[group] = [];
+                }
+                groups[group].push(p);
+            }
+            return groups;
         },
 
         get filteredSecrets() {
@@ -709,7 +774,7 @@ function vaultApp() {
                 if (!res.ok) throw new Error(data.message || 'Project creation failed');
 
                 this.showNewProjectModal = false;
-                this.newProjectForm = { name: '', slug: '', description: '' };
+                this.newProjectForm = { name: '', slug: '', description: '', group_name: '' };
                 this.toast('Project created with dev, staging, prod!', 'success');
                 await this.loadProjects();
             } catch (e) {
@@ -725,6 +790,57 @@ function vaultApp() {
         getCurlMemorySnippet() {
             const host = window.location.origin;
             return `export $(curl -fsSL -H "Authorization: Bearer ${this.newlyCreatedToken}" ${host}/api/v1/export | xargs)`;
+        },
+
+        getGithubActionsSnippet() {
+            const host = window.location.origin;
+            const secretRef = '$\x7b\x7b secrets.EXAVAULT_TOKEN \x7d\x7d';
+            return `# .github/workflows/deploy.yml
+name: Deploy Application
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Fetch .env from ExaVault using Repo Secret EXAVAULT_TOKEN
+      - name: Pull Secrets from ExaVault
+        run: |
+          curl -fsSL \\
+            -H "Authorization: Bearer ${secretRef}" \\
+            "${host}/api/v1/export" > .env
+
+      # 2. Build or Deploy with generated .env
+      - name: Build and Test
+        run: |
+          echo "Building with ExaVault environment..."
+          # docker build / npm run build / cargo build`;
+        },
+
+        getGitlabCiSnippet() {
+            const host = window.location.origin;
+            return `# .gitlab-ci.yml
+# Configure in GitLab: Settings -> CI/CD -> Variables -> Add EXAVAULT_TOKEN (Masked)
+
+stages:
+  - build
+  - deploy
+
+build_app:
+  stage: build
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl
+    # 1. Pull .env from ExaVault
+    - curl -fsSL -H "Authorization: Bearer \$EXAVAULT_TOKEN" "${host}/api/v1/export" > .env
+  script:
+    - echo "Environment injected successfully for \$CI_PROJECT_NAME"
+    # Execute build / test commands`;
         },
 
         getMcpSnippet() {
