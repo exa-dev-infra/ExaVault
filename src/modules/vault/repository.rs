@@ -288,5 +288,256 @@ impl VaultRepository {
 
         Ok(())
     }
+
+    // -----------------------------------------------------------------------
+    // RBAC & Project Member Queries
+    // -----------------------------------------------------------------------
+
+    pub async fn list_projects_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<ProjectWithEnvironments>, AppError> {
+        let projects: Vec<Project> = sqlx::query_as(
+            "SELECT p.id, p.name, p.slug, p.description, p.group_name, p.created_at
+             FROM projects p
+             INNER JOIN project_members pm ON pm.project_id = p.id
+             WHERE pm.user_id = $1
+             ORDER BY COALESCE(p.group_name, '') ASC, p.name ASC"
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        let mut result = Vec::with_capacity(projects.len());
+        for project in projects {
+            let envs: Vec<Environment> = sqlx::query_as(
+                "SELECT id, project_id, name, slug, created_at FROM environments WHERE project_id = $1 ORDER BY created_at ASC"
+            )
+            .bind(project.id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+            result.push(ProjectWithEnvironments {
+                project,
+                environments: envs,
+            });
+        }
+
+        Ok(result)
+    }
+
+    pub async fn get_user_project_role(
+        &self,
+        user_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<Option<String>, AppError> {
+        let role: Option<String> = sqlx::query_scalar(
+            "SELECT role FROM project_members WHERE user_id = $1 AND project_id = $2"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(role)
+    }
+
+    pub async fn get_project_id_by_env_id(&self, env_id: Uuid) -> Result<Uuid, AppError> {
+        let project_id: Uuid = sqlx::query_scalar(
+            "SELECT project_id FROM environments WHERE id = $1"
+        )
+        .bind(env_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::not_found("Environment not found", CODE_ENVIRONMENT_NOT_FOUND))?;
+
+        Ok(project_id)
+    }
+
+    pub async fn get_secret_env_id(&self, secret_id: Uuid) -> Result<Uuid, AppError> {
+        let env_id: Uuid = sqlx::query_scalar("SELECT environment_id FROM secrets WHERE id = $1")
+            .bind(secret_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::Database)?
+            .ok_or_else(|| AppError::not_found("Secret not found", CODE_SECRET_NOT_FOUND))?;
+        Ok(env_id)
+    }
+
+    pub async fn get_token_env_id(&self, token_id: Uuid) -> Result<Uuid, AppError> {
+        let env_id: Uuid = sqlx::query_scalar("SELECT environment_id FROM service_tokens WHERE id = $1")
+            .bind(token_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::Database)?
+            .ok_or_else(|| AppError::not_found("Service token not found", CODE_TOKEN_NOT_FOUND))?;
+        Ok(env_id)
+    }
+
+    // -----------------------------------------------------------------------
+    // User Management Queries
+    // -----------------------------------------------------------------------
+
+    pub async fn find_user_by_identifier(&self, identifier: &str) -> Result<Option<(Uuid, String, String, String, String, bool)>, AppError> {
+        let row: Option<(Uuid, String, String, String, String, bool)> = sqlx::query_as(
+            "SELECT id, name, email, password, role, is_active FROM users WHERE email = $1 OR name = $1 LIMIT 1"
+        )
+        .bind(identifier)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(row)
+    }
+
+    pub async fn list_users_with_projects(&self) -> Result<Vec<UserSummary>, AppError> {
+        let users: Vec<(Uuid, String, String, String, bool, DateTime<Utc>)> = sqlx::query_as(
+            "SELECT id, name, email, role, is_active, created_at FROM users ORDER BY created_at ASC"
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        let mut summaries = Vec::with_capacity(users.len());
+        for (id, name, email, role, is_active, created_at) in users {
+            let assigned: Vec<AssignedProjectInfo> = sqlx::query_as(
+                "SELECT pm.project_id, p.name AS project_name, p.group_name, pm.role
+                 FROM project_members pm
+                 INNER JOIN projects p ON p.id = pm.project_id
+                 WHERE pm.user_id = $1
+                 ORDER BY p.name ASC"
+            )
+            .bind(id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+            summaries.push(UserSummary {
+                id,
+                name,
+                email,
+                role,
+                is_active,
+                created_at,
+                assigned_projects: assigned,
+            });
+        }
+
+        Ok(summaries)
+    }
+
+    pub async fn create_user(
+        &self,
+        name: &str,
+        email: &str,
+        password_hash: &str,
+        role: &str,
+    ) -> Result<UserSummary, AppError> {
+        let (id, created_at): (Uuid, DateTime<Utc>) = sqlx::query_as(
+            "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, created_at"
+        )
+        .bind(name)
+        .bind(email)
+        .bind(password_hash)
+        .bind(role)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(UserSummary {
+            id,
+            name: name.to_string(),
+            email: email.to_string(),
+            role: role.to_string(),
+            is_active: true,
+            created_at,
+            assigned_projects: Vec::new(),
+        })
+    }
+
+    pub async fn update_user(
+        &self,
+        id: Uuid,
+        name: Option<&str>,
+        email: Option<&str>,
+        role: Option<&str>,
+        is_active: Option<bool>,
+        password_hash: Option<&str>,
+    ) -> Result<(), AppError> {
+        if let Some(n) = name {
+            sqlx::query("UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2")
+                .bind(n).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+        if let Some(e) = email {
+            sqlx::query("UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2")
+                .bind(e).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+        if let Some(r) = role {
+            sqlx::query("UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2")
+                .bind(r).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+        if let Some(a) = is_active {
+            sqlx::query("UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2")
+                .bind(a).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+        if let Some(p) = password_hash {
+            sqlx::query("UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2")
+                .bind(p).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+        Ok(())
+    }
+
+    pub async fn delete_user(&self, id: Uuid) -> Result<(), AppError> {
+        let res = sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+        if res.rows_affected() == 0 {
+            return Err(AppError::not_found("User not found", "USER_NOT_FOUND"));
+        }
+        Ok(())
+    }
+
+    pub async fn assign_user_to_project(
+        &self,
+        user_id: Uuid,
+        project_id: Uuid,
+        role: &str,
+    ) -> Result<(), AppError> {
+        sqlx::query(
+            "INSERT INTO project_members (user_id, project_id, role)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id, project_id) DO UPDATE SET role = EXCLUDED.role"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(role)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(())
+    }
+
+    pub async fn remove_user_from_project(
+        &self,
+        user_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<(), AppError> {
+        sqlx::query("DELETE FROM project_members WHERE user_id = $1 AND project_id = $2")
+            .bind(user_id)
+            .bind(project_id)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+        Ok(())
+    }
 }
 

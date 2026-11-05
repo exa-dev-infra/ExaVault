@@ -122,20 +122,26 @@ pub fn hash_service_token(raw_token: &str) -> String {
     hex::encode(hash)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: String,
+    pub username: String,
+    pub email: String,
+    pub role: String,
     pub exp: usize,
     pub iat: usize,
 }
 
 /// Creates a signed HS256 JWT valid for 7 days.
-pub fn create_jwt(username: &str, secret: &str) -> Result<String, AppError> {
+pub fn create_jwt(user_id: &str, username: &str, email: &str, role: &str, secret: &str) -> Result<String, AppError> {
     let now = Utc::now().timestamp() as usize;
     let exp = now + (7 * 24 * 60 * 60); // 7 days
 
     let claims = Claims {
-        sub: username.to_string(),
+        sub: user_id.to_string(),
+        username: username.to_string(),
+        email: email.to_string(),
+        role: role.to_string(),
         exp,
         iat: now,
     };

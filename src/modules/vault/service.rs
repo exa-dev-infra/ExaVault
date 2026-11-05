@@ -234,6 +234,148 @@ impl VaultService {
             }
         }
     }
+
+    // -----------------------------------------------------------------------
+    // RBAC & Scoped Project Access
+    // -----------------------------------------------------------------------
+
+    pub async fn list_projects_for_user(
+        &self,
+        user: &VaultAuthUser,
+    ) -> Result<Vec<ProjectWithEnvironments>, AppError> {
+        if user.role == "admin" {
+            self.repo.list_projects().await
+        } else {
+            self.repo.list_projects_for_user(user.id).await
+        }
+    }
+
+    pub async fn check_project_permission(
+        &self,
+        user: &VaultAuthUser,
+        project_id: Uuid,
+        required_level: &str, // "read", "editor", "admin"
+    ) -> Result<String, AppError> {
+        if user.role == "admin" {
+            return Ok("admin".to_string());
+        }
+
+        let role = self
+            .repo
+            .get_user_project_role(user.id, project_id)
+            .await?
+            .ok_or_else(|| AppError::forbidden("You do not have access to this project", CODE_FORBIDDEN))?;
+
+        match required_level {
+            "admin" => {
+                if role != "admin" {
+                    return Err(AppError::forbidden("Project administrator privileges required", CODE_FORBIDDEN));
+                }
+            }
+            "editor" => {
+                if role == "viewer" {
+                    return Err(AppError::forbidden("Viewer role has read-only access. Modification is forbidden.", CODE_FORBIDDEN));
+                }
+            }
+            _ => {} // "read" allows viewer, editor, and admin
+        }
+
+        Ok(role)
+    }
+
+    pub async fn check_env_permission(
+        &self,
+        user: &VaultAuthUser,
+        env_id: Uuid,
+        required_level: &str,
+    ) -> Result<String, AppError> {
+        let project_id = self.repo.get_project_id_by_env_id(env_id).await?;
+        self.check_project_permission(user, project_id, required_level).await
+    }
+
+    // -----------------------------------------------------------------------
+    // User Management Methods
+    // -----------------------------------------------------------------------
+
+    pub async fn authenticate_user(
+        &self,
+        identifier: &str,
+        password: &str,
+    ) -> Result<Option<VaultAuthUser>, AppError> {
+        let user = self.repo.find_user_by_identifier(identifier).await?;
+        if let Some((id, name, email, password_hash, role, is_active)) = user {
+            if !is_active {
+                return Err(AppError::unauthorized("User account is disabled", CODE_UNAUTHORIZED));
+            }
+            if crate::pkg::auth::password::verify_password(password, &password_hash).unwrap_or(false) {
+                return Ok(Some(VaultAuthUser {
+                    id,
+                    username: name,
+                    email,
+                    role,
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn list_users(&self) -> Result<Vec<UserSummary>, AppError> {
+        self.repo.list_users_with_projects().await
+    }
+
+    pub async fn create_user(&self, req: CreateVaultUserRequest) -> Result<UserSummary, AppError> {
+        let name = req.name.trim();
+        let email = req.email.trim();
+        if name.is_empty() || email.is_empty() {
+            return Err(AppError::bad_request("Name and email are required", "INVALID_USER_DATA"));
+        }
+
+        let password_hash = crate::pkg::auth::password::hash_password(&req.password)?;
+        let role = req.role.unwrap_or_else(|| "user".to_string());
+
+        self.repo.create_user(name, email, &password_hash, &role).await
+    }
+
+    pub async fn update_user(&self, id: Uuid, req: UpdateVaultUserRequest) -> Result<(), AppError> {
+        let password_hash = match req.password {
+            Some(ref p) if !p.trim().is_empty() => Some(crate::pkg::auth::password::hash_password(p)?),
+            _ => None,
+        };
+
+        self.repo
+            .update_user(
+                id,
+                req.name.as_deref(),
+                req.email.as_deref(),
+                req.role.as_deref(),
+                req.is_active,
+                password_hash.as_deref(),
+            )
+            .await
+    }
+
+    pub async fn delete_user(&self, id: Uuid) -> Result<(), AppError> {
+        self.repo.delete_user(id).await
+    }
+
+    pub async fn assign_project(
+        &self,
+        user_id: Uuid,
+        project_id: Uuid,
+        role: &str,
+    ) -> Result<(), AppError> {
+        let valid_role = match role.to_lowercase().as_str() {
+            "admin" => "admin",
+            "editor" => "editor",
+            "viewer" => "viewer",
+            _ => "editor",
+        };
+        self.repo.assign_user_to_project(user_id, project_id, valid_role).await
+    }
+
+    pub async fn remove_project(&self, user_id: Uuid, project_id: Uuid) -> Result<(), AppError> {
+        self.repo.remove_user_from_project(user_id, project_id).await
+    }
 }
 
 /// Escapes values for standard .env files

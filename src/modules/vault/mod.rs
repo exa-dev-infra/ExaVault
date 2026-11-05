@@ -12,7 +12,7 @@ use axum::{
 use crate::modules::vault::handler::*;
 
 pub fn vault_router(ctx: VaultContext) -> Router {
-    // 1. Protected Admin Dashboard Endpoints
+    // 1. Protected Dashboard & Vault Endpoints
     let protected_routes = Router::new()
         .route("/auth/me", get(me_handler))
         .route("/auth/logout", post(logout_handler))
@@ -28,6 +28,11 @@ pub fn vault_router(ctx: VaultContext) -> Router {
             get(list_tokens_handler).post(create_token_handler),
         )
         .route("/tokens/:id", delete(delete_token_handler))
+        // User Management & RBAC routes
+        .route("/users", get(list_users_handler).post(create_user_handler))
+        .route("/users/:id", axum::routing::put(update_user_handler).delete(delete_user_handler))
+        .route("/users/:id/projects", post(assign_user_project_handler))
+        .route("/users/:id/projects/:project_id", delete(remove_user_project_handler))
         .layer(from_fn_with_state(ctx.clone(), require_admin_auth));
 
     // 2. Public Endpoints

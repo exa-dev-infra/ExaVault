@@ -80,8 +80,25 @@
         </div>
 
         <!-- Right User Actions -->
-        <div class="flex items-center gap-3">
-            <button @click="openTokensModal()"
+        <div class="flex items-center gap-2.5">
+            <!-- User Role Badge -->
+            <div class="flex items-center gap-2 bg-dark-850 px-2.5 py-1.5 rounded-lg border border-dark-800 text-xs">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="font-medium text-zinc-200" x-text="currentUser.username || 'Admin'"></span>
+                <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded"
+                      :class="currentUser.is_admin ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'bg-zinc-800 text-zinc-400'"
+                      x-text="currentUser.is_admin ? 'Admin' : (currentUserRoleInProject || 'Member')"></span>
+            </div>
+
+            <!-- Manage Users & RBAC (Admin Only) -->
+            <button x-show="currentUser.is_admin" @click="openUsersModal()"
+                    class="bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-xs font-medium text-brand-300 hover:text-white transition-colors flex items-center gap-1.5">
+                <span>👥</span>
+                <span>Team & RBAC</span>
+            </button>
+
+            <!-- Service Tokens -->
+            <button x-show="currentUserRoleInProject !== 'viewer'" @click="openTokensModal()"
                     class="bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition-colors flex items-center gap-2">
                 <span>🔑 Service Tokens</span>
                 <span class="bg-dark-800 text-zinc-400 px-1.5 py-0.5 rounded text-[10px]" x-text="tokens.length"></span>
@@ -97,6 +114,13 @@
     <!-- Main Content Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-5">
         
+        <!-- Read-Only Viewer Warning Banner -->
+        <div x-show="currentUserRoleInProject === 'viewer'"
+             class="bg-blue-950/40 border border-blue-800/60 rounded-xl px-4 py-2.5 text-xs text-blue-300 flex items-center gap-2 shadow-sm">
+            <span>👁️</span>
+            <span><strong>Read-Only Mode:</strong> You have <strong>Viewer</strong> access to this project. You can inspect and copy decrypted secret values, but modifications and token generation are restricted.</span>
+        </div>
+
         <!-- Controls & Mode Switcher Bar -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-dark-900 border border-dark-800 p-3.5 rounded-xl">
             <div class="flex items-center gap-3">
@@ -124,7 +148,7 @@
 
             <!-- Action Buttons -->
             <div class="flex items-center gap-2.5">
-                <button x-show="viewMode === 'table'" @click="addSecretRow()"
+                <button x-show="viewMode === 'table' && currentUserRoleInProject !== 'viewer'" @click="addSecretRow()"
                         class="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
                     <span>＋</span>
                     <span>Add Variable</span>
@@ -136,7 +160,7 @@
                     <span>Download .env</span>
                 </button>
 
-                <button @click="saveSecrets()" :disabled="!isDirty || isSaving"
+                <button x-show="currentUserRoleInProject !== 'viewer'" @click="saveSecrets()" :disabled="!isDirty || isSaving"
                         class="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-brand-500/20">
                     <span x-show="!isSaving">Save Changes</span>
                     <span x-show="isSaving">Saving...</span>
@@ -486,6 +510,186 @@
         </div>
     </div>
 
+    <!-- Modal 4: Team & RBAC Management -->
+    <div x-show="showUsersModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div @click.away="showUsersModal = false"
+             class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl p-6 gap-5">
+            <div class="flex items-center justify-between pb-3 border-b border-dark-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400 font-bold text-base">
+                        👥
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">Team Access & Project RBAC</h3>
+                        <p class="text-xs text-zinc-400">Manage user credentials and assign scoped access to specific microservices.</p>
+                    </div>
+                </div>
+                <button @click="showUsersModal = false" class="text-zinc-400 hover:text-zinc-200">✕</button>
+            </div>
+
+            <!-- Top Actions: Add User -->
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Registered Team Members</span>
+                <button @click="showCreateUserModal = true"
+                        class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+                    <span>＋</span>
+                    <span>Create User</span>
+                </button>
+            </div>
+
+            <!-- Users Table -->
+            <div class="flex-1 overflow-y-auto border border-dark-800 rounded-xl bg-dark-950 divide-y divide-dark-800">
+                <template x-for="u in usersList" :key="u.id">
+                    <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold text-zinc-100" x-text="u.name"></span>
+                                <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded"
+                                      :class="u.role === 'admin' ? 'bg-purple-900/40 text-purple-300 border border-purple-700/50' : 'bg-zinc-800 text-zinc-300'"
+                                      x-text="u.role === 'admin' ? 'Global Admin' : 'Member'"></span>
+                                <span x-show="!u.is_active" class="bg-rose-950 text-rose-400 px-1.5 py-0.5 rounded text-[10px]">Deactivated</span>
+                            </div>
+                            <span class="text-zinc-400 font-mono text-[11px]" x-text="u.email"></span>
+                            
+                            <!-- Assigned Projects List -->
+                            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                <span class="text-[11px] text-zinc-500">Access:</span>
+                                <template x-if="u.role === 'admin'">
+                                    <span class="bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2 py-0.5 rounded text-[10px] font-medium">
+                                        ⚡ All Projects & Ecosystems (Full Admin)
+                                    </span>
+                                </template>
+                                <template x-if="u.role !== 'admin'">
+                                    <div class="flex flex-wrap gap-1">
+                                        <template x-for="p in u.assigned_projects" :key="p.project_id">
+                                            <span class="bg-dark-850 border border-dark-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] flex items-center gap-1.5">
+                                                <span x-text="p.group_name ? `${p.group_name} / ${p.project_name}` : p.project_name"></span>
+                                                <span class="text-[9px] uppercase px-1 rounded font-bold"
+                                                      :class="{
+                                                          'bg-rose-950 text-rose-300': p.role === 'admin',
+                                                          'bg-emerald-950 text-emerald-300': p.role === 'editor',
+                                                          'bg-blue-950 text-blue-300': p.role === 'viewer'
+                                                      }"
+                                                      x-text="p.role"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="u.assigned_projects.length === 0">
+                                            <span class="text-zinc-600 italic text-[11px]">No projects assigned yet</span>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- User Row Action Buttons -->
+                        <div class="flex items-center gap-2 self-end sm:self-center">
+                            <button x-show="u.role !== 'admin'"
+                                    @click="openAssignModal(u)"
+                                    class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-brand-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                                🔑 Assign Projects
+                            </button>
+                            <button @click="deleteVaultUser(u.id)"
+                                    class="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-2.5 py-1.5 rounded-lg text-xs transition-colors">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="usersList.length === 0">
+                    <div class="p-8 text-center text-xs text-zinc-500">
+                        No team members registered yet.
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 5: Create User Modal -->
+    <div x-show="showCreateUserModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div @click.away="showCreateUserModal = false"
+             class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
+            <h3 class="font-bold text-white text-base">Create Team Member</h3>
+            <form @submit.prevent="createVaultUser" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">Full Name</label>
+                    <input type="text" x-model="newUserForm.name" required placeholder="e.g. John Doe"
+                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">Email / Username</label>
+                    <input type="email" x-model="newUserForm.email" required placeholder="john@example.com"
+                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">Initial Password</label>
+                    <input type="password" x-model="newUserForm.password" required placeholder="••••••••"
+                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">System Role</label>
+                    <select x-model="newUserForm.role"
+                            class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                        <option value="user">Member (Scoped to assigned projects)</option>
+                        <option value="admin">Administrator (Full global system access)</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="showCreateUserModal = false" class="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-1.5 rounded-lg">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 6: Assign Projects to User -->
+    <div x-show="showAssignModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div @click.away="showAssignModal = false"
+             class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-xl max-h-[85vh] flex flex-col p-6 gap-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-dark-800">
+                <div>
+                    <h3 class="font-bold text-white text-base">Assign Project Access</h3>
+                    <p class="text-xs text-zinc-400">Configure access permissions for <span class="text-brand-300 font-semibold" x-text="selectedUserForAssign ? selectedUserForAssign.name : ''"></span></p>
+                </div>
+                <button @click="showAssignModal = false" class="text-zinc-400 hover:text-zinc-200">✕</button>
+            </div>
+
+            <!-- Project List with Role Pickers -->
+            <div class="flex-1 overflow-y-auto space-y-2 max-h-96 pr-1">
+                <template x-for="p in projects" :key="p.id">
+                    <div class="bg-dark-950 border border-dark-800 p-3 rounded-xl flex items-center justify-between text-xs"
+                         x-data="{ currentRole: getAssignedRole(p.id) }">
+                        <div>
+                            <div class="font-semibold text-zinc-200" x-text="p.group_name ? `${p.group_name} / ${p.name}` : p.name"></div>
+                            <div class="text-[10px] text-zinc-500 font-mono mt-0.5" x-text="p.slug"></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select x-model="currentRole"
+                                    class="bg-dark-850 border border-dark-800 rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none">
+                                <option value="editor">Editor (Read & Write secrets)</option>
+                                <option value="viewer">Viewer (Read-only)</option>
+                                <option value="admin">Project Admin (Full control)</option>
+                            </select>
+                            <template x-if="isProjectAssigned(p.id)">
+                                <button @click="removeProjectAssignment(p.id)"
+                                        class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded hover:bg-rose-950/30">
+                                    Revoke
+                                </button>
+                            </template>
+                            <button @click="saveProjectAssignment(p.id, currentRole)"
+                                    class="bg-brand-500 hover:bg-brand-600 text-white text-xs px-2.5 py-1 rounded font-medium">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-dark-800">
+                <button @click="showAssignModal = false" class="bg-dark-800 hover:bg-dark-700 text-white text-xs px-4 py-2 rounded-lg font-medium">Done</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- Alpine.js Application Logic -->
@@ -508,13 +712,40 @@ function vaultApp() {
         showTokensModal: false,
         showCreatedTokenModal: false,
         showNewProjectModal: false,
+        showUsersModal: false,
+        showCreateUserModal: false,
+        showAssignModal: false,
         newTokenName: '',
         newTokenDays: '30',
         newlyCreatedToken: '',
         newProjectForm: { name: '', slug: '', description: '', group_name: '' },
 
+        // RBAC & User Management State
+        currentUser: { id: null, username: '', email: '', role: '', is_admin: false },
+        currentUserRoleInProject: 'admin',
+        usersList: [],
+        selectedUserForAssign: null,
+        newUserForm: { name: '', email: '', password: '', role: 'user' },
+
         async initApp() {
+            await this.loadCurrentUser();
             await this.loadProjects();
+        },
+
+        async loadCurrentUser() {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                const data = await res.json();
+                if (data.data) {
+                    this.currentUser = data.data;
+                }
+            } catch (e) {
+                console.error(e);
+            }
         },
 
         get groupedProjects() {
@@ -579,7 +810,9 @@ function vaultApp() {
             try {
                 const res = await fetch(`/api/environments/${this.currentEnv.id}/secrets`);
                 const data = await res.json();
-                const list = data.data || [];
+                const resData = data.data || {};
+                const list = resData.secrets || (Array.isArray(resData) ? resData : []);
+                this.currentUserRoleInProject = resData.user_role || (this.currentUser.is_admin ? 'admin' : 'editor');
                 this.secrets = list.map(s => ({
                     id: s.id,
                     key: s.key,
@@ -872,6 +1105,103 @@ build_app:
             if (!iso) return '-';
             const d = new Date(iso);
             return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        },
+
+        // -------------------------------------------------------------------
+        // User Management & RBAC UI Handlers
+        // -------------------------------------------------------------------
+
+        async openUsersModal() {
+            this.showUsersModal = true;
+            await this.loadUsersList();
+        },
+
+        async loadUsersList() {
+            try {
+                const res = await fetch('/api/users');
+                const data = await res.json();
+                this.usersList = data.data || [];
+            } catch (e) {
+                this.toast('Failed to load users: ' + e.message, 'error');
+            }
+        },
+
+        async createVaultUser() {
+            try {
+                const res = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.newUserForm)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Failed to create user');
+                this.toast('User created successfully!', 'success');
+                this.showCreateUserModal = false;
+                this.newUserForm = { name: '', email: '', password: '', role: 'user' };
+                await this.loadUsersList();
+            } catch (e) {
+                this.toast('Error: ' + e.message, 'error');
+            }
+        },
+
+        async deleteVaultUser(id) {
+            if (!confirm('Are you sure you want to delete this user? All project assignments will be removed.')) return;
+            try {
+                const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed to delete user');
+                this.toast('User deleted', 'info');
+                await this.loadUsersList();
+            } catch (e) {
+                this.toast('Error: ' + e.message, 'error');
+            }
+        },
+
+        openAssignModal(user) {
+            this.selectedUserForAssign = user;
+            this.showAssignModal = true;
+        },
+
+        getAssignedRole(projectId) {
+            if (!this.selectedUserForAssign || !this.selectedUserForAssign.assigned_projects) return 'editor';
+            const found = this.selectedUserForAssign.assigned_projects.find(p => p.project_id === projectId);
+            return found ? found.role : 'editor';
+        },
+
+        isProjectAssigned(projectId) {
+            if (!this.selectedUserForAssign || !this.selectedUserForAssign.assigned_projects) return false;
+            return this.selectedUserForAssign.assigned_projects.some(p => p.project_id === projectId);
+        },
+
+        async saveProjectAssignment(projectId, role) {
+            if (!this.selectedUserForAssign) return;
+            try {
+                const res = await fetch(`/api/users/${this.selectedUserForAssign.id}/projects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ project_id: projectId, role })
+                });
+                if (!res.ok) throw new Error('Failed to update assignment');
+                this.toast('Project assigned successfully!', 'success');
+                await this.loadUsersList();
+                this.selectedUserForAssign = this.usersList.find(u => u.id === this.selectedUserForAssign.id);
+            } catch (e) {
+                this.toast('Error: ' + e.message, 'error');
+            }
+        },
+
+        async removeProjectAssignment(projectId) {
+            if (!this.selectedUserForAssign) return;
+            try {
+                const res = await fetch(`/api/users/${this.selectedUserForAssign.id}/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error('Failed to remove assignment');
+                this.toast('Project access revoked', 'info');
+                await this.loadUsersList();
+                this.selectedUserForAssign = this.usersList.find(u => u.id === this.selectedUserForAssign.id);
+            } catch (e) {
+                this.toast('Error: ' + e.message, 'error');
+            }
         },
 
         async logout() {

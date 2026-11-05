@@ -116,5 +116,62 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub token: String,
     pub username: String,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultAuthUser {
+    pub id: Uuid,
+    pub username: String,
+    pub email: String,
+    pub role: String, // "admin" or "user"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AssignedProjectInfo {
+    pub project_id: Uuid,
+    pub project_name: String,
+    pub group_name: Option<String>,
+    pub role: String, // "admin" | "editor" | "viewer"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSummary {
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub role: String,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub assigned_projects: Vec<AssignedProjectInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateVaultUserRequest {
+    pub name: String,
+    pub email: String,
+    pub password: String,
+    pub role: Option<String>, // default "user"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateVaultUserRequest {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub role: Option<String>,
+    pub is_active: Option<bool>,
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssignProjectRequest {
+    pub project_id: Uuid,
+    pub role: String, // "admin", "editor", "viewer"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvironmentSecretsResponse {
+    pub secrets: Vec<DecryptedSecret>,
+    pub user_role: String, // "admin", "editor", "viewer"
 }
 

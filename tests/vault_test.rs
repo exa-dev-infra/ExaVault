@@ -1,4 +1,5 @@
 use chrono::Utc;
+use uuid::Uuid;
 use exavault::{
     config::AppConfig,
     database::postgres::{create_postgres_pool, run_migrations},
@@ -8,23 +9,22 @@ use exavault::{
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 
-static SERVICE: OnceCell<Arc<VaultService>> = OnceCell::const_new();
+static MIGRATED: OnceCell<()> = OnceCell::const_new();
 
 async fn setup_test_context() -> Arc<VaultService> {
-    SERVICE
-        .get_or_init(|| async {
-            let config = AppConfig::from_env();
-            eprintln!("TEST CONFIG DATABASE_URL: {}", config.database_url);
-            let pool = create_postgres_pool(&config.database_url)
-                .await
-                .expect("Failed to connect to postgres");
-            run_migrations(&pool).await.expect("Failed migrations");
-
-            let repo = Arc::new(VaultRepository::new(pool));
-            Arc::new(VaultService::new(repo, config.master_key_bytes()))
-        })
+    let config = AppConfig::from_env();
+    let pool = create_postgres_pool(&config.database_url)
         .await
-        .clone()
+        .expect("Failed to connect to postgres");
+
+    MIGRATED
+        .get_or_init(|| async {
+            run_migrations(&pool).await.expect("Failed migrations");
+        })
+        .await;
+
+    let repo = Arc::new(VaultRepository::new(pool));
+    Arc::new(VaultService::new(repo, config.master_key_bytes()))
 }
 
 #[tokio::test]
@@ -157,4 +157,111 @@ async fn test_bulk_upsert_and_export_formats() {
     let token_hash = hash_service_token(&token_resp.token);
     let find_result = service.repository().find_token_by_hash(&token_hash).await;
     assert!(find_result.is_err());
+}
+
+#[tokio::test]
+async fn test_user_management_and_project_rbac() {
+    let service = setup_test_context().await;
+    let ts = Utc::now().timestamp_micros();
+
+    // 1. Create two test projects
+    let p1 = service
+        .create_project(CreateProjectRequest {
+            name: format!("RBAC Project 1 {}", ts),
+            slug: Some(format!("rbac-p1-{}", ts)),
+            description: None,
+            group_name: Some("RBAC Coffe".to_string()),
+        })
+        .await
+        .unwrap();
+
+    let p2 = service
+        .create_project(CreateProjectRequest {
+            name: format!("RBAC Project 2 {}", ts),
+            slug: Some(format!("rbac-p2-{}", ts)),
+            description: None,
+            group_name: Some("RBAC Coffe".to_string()),
+        })
+        .await
+        .unwrap();
+
+    // 2. Create a team member user
+    let user_email = format!("developer_{}@test.local", ts);
+    let created_user = service
+        .create_user(CreateVaultUserRequest {
+            name: "John Developer".to_string(),
+            email: user_email.clone(),
+            password: "DevPassword123!".to_string(),
+            role: Some("user".to_string()),
+        })
+        .await
+        .expect("Failed to create user");
+
+    assert_eq!(created_user.name, "John Developer");
+    assert_eq!(created_user.role, "user");
+
+    // Authenticate user check
+    let auth_user = service
+        .authenticate_user(&user_email, "DevPassword123!")
+        .await
+        .unwrap()
+        .expect("User should authenticate successfully");
+
+    assert_eq!(auth_user.id, created_user.id);
+
+    // 3. Before assignment, user has 0 projects
+    let user_projects = service.list_projects_for_user(&auth_user).await.unwrap();
+    assert_eq!(user_projects.len(), 0);
+
+    // 4. Assign user to p1 as "viewer"
+    service
+        .assign_project(created_user.id, p1.project.id, "viewer")
+        .await
+        .unwrap();
+
+    let user_projects = service.list_projects_for_user(&auth_user).await.unwrap();
+    assert_eq!(user_projects.len(), 1);
+    assert_eq!(user_projects[0].project.id, p1.project.id);
+
+    // 5. Check permissions on p1
+    // "read" should be allowed
+    let perm = service.check_project_permission(&auth_user, p1.project.id, "read").await;
+    assert!(perm.is_ok());
+    assert_eq!(perm.unwrap(), "viewer");
+
+    // "editor" should fail because role is viewer
+    let editor_perm = service.check_project_permission(&auth_user, p1.project.id, "editor").await;
+    assert!(editor_perm.is_err());
+
+    // Access to unassigned p2 should fail
+    let p2_perm = service.check_project_permission(&auth_user, p2.project.id, "read").await;
+    assert!(p2_perm.is_err());
+
+    // 6. Upgrade user to "editor" on p1
+    service
+        .assign_project(created_user.id, p1.project.id, "editor")
+        .await
+        .unwrap();
+
+    let editor_perm = service.check_project_permission(&auth_user, p1.project.id, "editor").await;
+    assert!(editor_perm.is_ok());
+
+    // 7. Global Admin has access to all projects
+    let admin_user = VaultAuthUser {
+        id: Uuid::nil(),
+        username: "admin".to_string(),
+        email: "admin@exavault.local".to_string(),
+        role: "admin".to_string(),
+    };
+
+    let admin_p1_perm = service.check_project_permission(&admin_user, p1.project.id, "admin").await;
+    assert!(admin_p1_perm.is_ok());
+
+    let admin_p2_perm = service.check_project_permission(&admin_user, p2.project.id, "admin").await;
+    assert!(admin_p2_perm.is_ok());
+
+    // 8. Delete user & verify project cleanup
+    service.delete_user(created_user.id).await.unwrap();
+    service.delete_project(p1.project.id).await.unwrap();
+    service.delete_project(p2.project.id).await.unwrap();
 }
