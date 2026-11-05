@@ -24,7 +24,10 @@ impl VaultRepository {
 
     pub async fn list_projects(&self) -> Result<Vec<ProjectWithEnvironments>, AppError> {
         let projects: Vec<Project> = sqlx::query_as(
-            "SELECT id, name, slug, description, group_name, created_at FROM projects ORDER BY COALESCE(group_name, '') ASC, name ASC"
+            "SELECT p.id, p.name, p.slug, p.description, p.group_id, g.name AS group_name, p.created_at
+             FROM projects p
+             LEFT JOIN project_groups g ON g.id = p.group_id
+             ORDER BY COALESCE(g.name, '') ASC, p.name ASC"
         )
         .fetch_all(&self.pool)
         .await
@@ -54,17 +57,21 @@ impl VaultRepository {
         name: &str,
         slug: &str,
         description: Option<&str>,
-        group_name: Option<&str>,
+        group_id: Option<Uuid>,
     ) -> Result<ProjectWithEnvironments, AppError> {
         let mut tx = self.pool.begin().await.map_err(AppError::Database)?;
 
         let project: Project = sqlx::query_as(
-            "INSERT INTO projects (name, slug, description, group_name) VALUES ($1, $2, $3, $4) RETURNING id, name, slug, description, group_name, created_at"
+            "INSERT INTO projects (name, slug, description, group_id)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, name, slug, description, group_id,
+                       (SELECT name FROM project_groups WHERE id = $4) AS group_name,
+                       created_at"
         )
         .bind(name)
         .bind(slug)
         .bind(description)
-        .bind(group_name)
+        .bind(group_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(AppError::Database)?;
@@ -298,11 +305,12 @@ impl VaultRepository {
         user_id: Uuid,
     ) -> Result<Vec<ProjectWithEnvironments>, AppError> {
         let projects: Vec<Project> = sqlx::query_as(
-            "SELECT p.id, p.name, p.slug, p.description, p.group_name, p.created_at
+            "SELECT p.id, p.name, p.slug, p.description, p.group_id, g.name AS group_name, p.created_at
              FROM projects p
+             LEFT JOIN project_groups g ON g.id = p.group_id
              INNER JOIN project_members pm ON pm.project_id = p.id
              WHERE pm.user_id = $1
-             ORDER BY COALESCE(p.group_name, '') ASC, p.name ASC"
+             ORDER BY COALESCE(g.name, '') ASC, p.name ASC"
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -405,9 +413,10 @@ impl VaultRepository {
         let mut summaries = Vec::with_capacity(users.len());
         for (id, name, email, role, is_active, created_at) in users {
             let assigned: Vec<AssignedProjectInfo> = sqlx::query_as(
-                "SELECT pm.project_id, p.name AS project_name, p.group_name, pm.role
+                "SELECT pm.project_id, p.name AS project_name, p.group_id, g.name AS group_name, pm.role
                  FROM project_members pm
                  INNER JOIN projects p ON p.id = pm.project_id
+                 LEFT JOIN project_groups g ON g.id = p.group_id
                  WHERE pm.user_id = $1
                  ORDER BY p.name ASC"
             )
@@ -537,6 +546,127 @@ impl VaultRepository {
             .await
             .map_err(AppError::Database)?;
 
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Project Groups (Ecosystem) Queries
+    // -----------------------------------------------------------------------
+
+    pub async fn list_groups(&self) -> Result<Vec<ProjectGroupWithCount>, AppError> {
+        let rows: Vec<(Uuid, String, String, Option<String>, i64, DateTime<Utc>, DateTime<Utc>)> = sqlx::query_as(
+            "SELECT g.id, g.name, g.slug, g.description,
+                    COALESCE(COUNT(p.id), 0)::BIGINT AS projects_count,
+                    g.created_at, g.updated_at
+             FROM project_groups g
+             LEFT JOIN projects p ON p.group_id = g.id
+             GROUP BY g.id
+             ORDER BY g.name ASC"
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(rows.into_iter().map(|(id, name, slug, description, projects_count, created_at, updated_at)| {
+            ProjectGroupWithCount {
+                id,
+                name,
+                slug,
+                description,
+                projects_count,
+                created_at,
+                updated_at,
+            }
+        }).collect())
+    }
+
+    pub async fn find_or_create_group_by_name(&self, name: &str) -> Result<Uuid, AppError> {
+        let trimmed = name.trim();
+        let slug = trimmed
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_string();
+
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO project_groups (name, slug)
+             VALUES ($1, $2)
+             ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+             RETURNING id"
+        )
+        .bind(trimmed)
+        .bind(&slug)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(id)
+    }
+
+    pub async fn create_group(
+        &self,
+        name: &str,
+        slug: &str,
+        description: Option<&str>,
+    ) -> Result<ProjectGroup, AppError> {
+        let group: ProjectGroup = sqlx::query_as(
+            "INSERT INTO project_groups (name, slug, description)
+             VALUES ($1, $2, $3)
+             RETURNING id, name, slug, description, created_at, updated_at"
+        )
+        .bind(name)
+        .bind(slug)
+        .bind(description)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(group)
+    }
+
+    pub async fn update_group(
+        &self,
+        id: Uuid,
+        name: Option<&str>,
+        slug: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<ProjectGroup, AppError> {
+        if let Some(n) = name {
+            sqlx::query("UPDATE project_groups SET name = $1, updated_at = NOW() WHERE id = $2")
+                .bind(n).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+        if let Some(s) = slug {
+            sqlx::query("UPDATE project_groups SET slug = $1, updated_at = NOW() WHERE id = $2")
+                .bind(s).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+        if let Some(d) = description {
+            sqlx::query("UPDATE project_groups SET description = $1, updated_at = NOW() WHERE id = $2")
+                .bind(d).bind(id).execute(&self.pool).await.map_err(AppError::Database)?;
+        }
+
+        let updated: ProjectGroup = sqlx::query_as(
+            "SELECT id, name, slug, description, created_at, updated_at FROM project_groups WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(updated)
+    }
+
+    pub async fn delete_group(&self, id: Uuid) -> Result<(), AppError> {
+        let res = sqlx::query("DELETE FROM project_groups WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+        if res.rows_affected() == 0 {
+            return Err(AppError::not_found("Project group not found", "GROUP_NOT_FOUND"));
+        }
         Ok(())
     }
 }

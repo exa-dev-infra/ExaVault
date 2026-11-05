@@ -4,11 +4,47 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProjectGroup {
+    pub id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectGroupWithCount {
+    pub id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub projects_count: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProjectGroupRequest {
+    pub name: String,
+    pub slug: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateProjectGroupRequest {
+    pub name: Option<String>,
+    pub slug: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Project {
     pub id: Uuid,
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
+    pub group_id: Option<Uuid>,
     pub group_name: Option<String>,
     pub created_at: DateTime<Utc>,
 }
@@ -79,6 +115,7 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub slug: Option<String>,
     pub description: Option<String>,
+    pub group_id: Option<Uuid>,
     pub group_name: Option<String>,
 }
 
@@ -131,6 +168,7 @@ pub struct VaultAuthUser {
 pub struct AssignedProjectInfo {
     pub project_id: Uuid,
     pub project_name: String,
+    pub group_id: Option<Uuid>,
     pub group_name: Option<String>,
     pub role: String, // "admin" | "editor" | "viewer"
 }

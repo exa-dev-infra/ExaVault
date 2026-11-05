@@ -194,6 +194,54 @@ pub async fn delete_project_handler(
 }
 
 // ---------------------------------------------------------------------------
+// Project Groups Handlers (Ecosystem Management)
+// ---------------------------------------------------------------------------
+
+pub async fn list_groups_handler(
+    State(ctx): State<VaultContext>,
+) -> Result<impl IntoResponse, AppError> {
+    let groups = ctx.service.list_groups().await?;
+    Ok(BaseResponse::success(groups, "Groups retrieved successfully"))
+}
+
+pub async fn create_group_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Json(payload): Json<CreateProjectGroupRequest>,
+) -> Result<(StatusCode, impl IntoResponse), AppError> {
+    if user.role != "admin" {
+        return Err(AppError::forbidden("Only administrators can create project groups", CODE_FORBIDDEN));
+    }
+    let created = ctx.service.create_group(payload).await?;
+    Ok((StatusCode::CREATED, BaseResponse::success(created, "Group created successfully")))
+}
+
+pub async fn update_group_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateProjectGroupRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    if user.role != "admin" {
+        return Err(AppError::forbidden("Only administrators can update project groups", CODE_FORBIDDEN));
+    }
+    let updated = ctx.service.update_group(id, payload).await?;
+    Ok(BaseResponse::success(updated, "Group updated successfully"))
+}
+
+pub async fn delete_group_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    if user.role != "admin" {
+        return Err(AppError::forbidden("Only administrators can delete project groups", CODE_FORBIDDEN));
+    }
+    ctx.service.delete_group(id).await?;
+    Ok(BaseResponse::success(json!({ "id": id }), "Group deleted successfully"))
+}
+
+// ---------------------------------------------------------------------------
 // Secrets Handlers
 // ---------------------------------------------------------------------------
 

@@ -36,6 +36,7 @@ async fn test_project_creation_and_auto_seed_environments() {
         name: "Test Automation Project".to_string(),
         slug: Some(slug.clone()),
         description: Some("Automated test project".to_string()),
+        group_id: None,
         group_name: Some("Ecosystem Coffe".to_string()),
     };
 
@@ -89,6 +90,7 @@ async fn test_bulk_upsert_and_export_formats() {
             name: "Export Test".to_string(),
             slug: Some(proj_slug),
             description: None,
+            group_id: None,
             group_name: None,
         })
         .await
@@ -170,6 +172,7 @@ async fn test_user_management_and_project_rbac() {
             name: format!("RBAC Project 1 {}", ts),
             slug: Some(format!("rbac-p1-{}", ts)),
             description: None,
+            group_id: None,
             group_name: Some("RBAC Coffe".to_string()),
         })
         .await
@@ -180,6 +183,7 @@ async fn test_user_management_and_project_rbac() {
             name: format!("RBAC Project 2 {}", ts),
             slug: Some(format!("rbac-p2-{}", ts)),
             description: None,
+            group_id: None,
             group_name: Some("RBAC Coffe".to_string()),
         })
         .await
@@ -262,6 +266,87 @@ async fn test_user_management_and_project_rbac() {
 
     // 8. Delete user & verify project cleanup
     service.delete_user(created_user.id).await.unwrap();
+    service.delete_project(p1.project.id).await.unwrap();
+    service.delete_project(p2.project.id).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_first_class_ecosystem_groups_and_relational_join() {
+    let service = setup_test_context().await;
+    let ts = Utc::now().timestamp_micros();
+
+    // 1. Create a first-class ecosystem group (e.g. "Fintech Platform")
+    let group = service
+        .create_group(CreateProjectGroupRequest {
+            name: format!("Fintech Hub {}", ts),
+            slug: Some(format!("fintech-hub-{}", ts)),
+            description: Some("Banking and payments microservices".to_string()),
+        })
+        .await
+        .expect("Failed to create ecosystem group");
+
+    assert_eq!(group.name, format!("Fintech Hub {}", ts));
+
+    // 2. Create projects linked to this group via foreign key group_id
+    let p1 = service
+        .create_project(CreateProjectRequest {
+            name: format!("Payment Service {}", ts),
+            slug: Some(format!("pay-svc-{}", ts)),
+            description: None,
+            group_id: Some(group.id),
+            group_name: None,
+        })
+        .await
+        .expect("Failed to create child project 1");
+
+    let p2 = service
+        .create_project(CreateProjectRequest {
+            name: format!("Ledger Service {}", ts),
+            slug: Some(format!("ledger-svc-{}", ts)),
+            description: None,
+            group_id: Some(group.id),
+            group_name: None,
+        })
+        .await
+        .expect("Failed to create child project 2");
+
+    assert_eq!(p1.project.group_id, Some(group.id));
+    assert_eq!(p1.project.group_name.as_deref(), Some(group.name.as_str()));
+    assert_eq!(p2.project.group_id, Some(group.id));
+
+    // 3. Verify group count in list_groups
+    let groups = service.list_groups().await.expect("Failed to list groups");
+    let found_group = groups.iter().find(|g| g.id == group.id).expect("Group not found");
+    assert_eq!(found_group.projects_count, 2);
+
+    // 4. Test Relational Power: Rename the group!
+    let new_name = format!("Fintech Global {}", ts);
+    let updated_group = service
+        .update_group(
+            group.id,
+            UpdateProjectGroupRequest {
+                name: Some(new_name.clone()),
+                slug: None,
+                description: None,
+            },
+        )
+        .await
+        .expect("Failed to update group");
+    assert_eq!(updated_group.name, new_name);
+
+    // Querying projects via JOIN now reflects the new name without touching project rows!
+    let projs = service.list_projects().await.expect("Failed to list projects");
+    let found_p1 = projs.iter().find(|p| p.project.id == p1.project.id).unwrap();
+    assert_eq!(found_p1.project.group_name.as_deref(), Some(new_name.as_str()));
+
+    // 5. Test ON DELETE SET NULL: Delete group leaves projects as standalone!
+    service.delete_group(group.id).await.expect("Failed to delete group");
+    let projs = service.list_projects().await.expect("Failed to list projects");
+    let found_p1 = projs.iter().find(|p| p.project.id == p1.project.id).unwrap();
+    assert_eq!(found_p1.project.group_id, None);
+    assert_eq!(found_p1.project.group_name, None);
+
+    // Cleanup projects
     service.delete_project(p1.project.id).await.unwrap();
     service.delete_project(p2.project.id).await.unwrap();
 }

@@ -47,8 +47,19 @@ impl VaultService {
         });
         let slug = slug.trim_matches('-').to_string();
 
+        let group_id = match req.group_id {
+            Some(gid) => Some(gid),
+            None => match req.group_name {
+                Some(ref gname) if !gname.trim().is_empty() => {
+                    let gid = self.repo.find_or_create_group_by_name(gname).await?;
+                    Some(gid)
+                }
+                _ => None,
+            },
+        };
+
         self.repo
-            .create_project(name, &slug, req.description.as_deref(), req.group_name.as_deref())
+            .create_project(name, &slug, req.description.as_deref(), group_id)
             .await
     }
 
@@ -375,6 +386,40 @@ impl VaultService {
 
     pub async fn remove_project(&self, user_id: Uuid, project_id: Uuid) -> Result<(), AppError> {
         self.repo.remove_user_from_project(user_id, project_id).await
+    }
+
+    // -----------------------------------------------------------------------
+    // Project Groups (Ecosystem) Management
+    // -----------------------------------------------------------------------
+
+    pub async fn list_groups(&self) -> Result<Vec<ProjectGroupWithCount>, AppError> {
+        self.repo.list_groups().await
+    }
+
+    pub async fn create_group(&self, req: CreateProjectGroupRequest) -> Result<ProjectGroup, AppError> {
+        let name = req.name.trim();
+        if name.is_empty() {
+            return Err(AppError::bad_request("Group name cannot be empty", "INVALID_NAME"));
+        }
+        let slug = req.slug.unwrap_or_else(|| {
+            name.to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+        });
+        let slug = slug.trim_matches('-').to_string();
+
+        self.repo.create_group(name, &slug, req.description.as_deref()).await
+    }
+
+    pub async fn update_group(&self, id: Uuid, req: UpdateProjectGroupRequest) -> Result<ProjectGroup, AppError> {
+        self.repo
+            .update_group(id, req.name.as_deref(), req.slug.as_deref(), req.description.as_deref())
+            .await
+    }
+
+    pub async fn delete_group(&self, id: Uuid) -> Result<(), AppError> {
+        self.repo.delete_group(id).await
     }
 }
 
