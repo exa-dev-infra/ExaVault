@@ -350,3 +350,16 @@ async fn test_first_class_ecosystem_groups_and_relational_join() {
     service.delete_project(p1.project.id).await.unwrap();
     service.delete_project(p2.project.id).await.unwrap();
 }
+
+#[tokio::test]
+async fn test_brand_assets_and_web_routes() {
+    let favicon = include_str!("../public/favicon.svg");
+    let logo = include_str!("../public/logo.svg");
+
+    assert!(favicon.contains("<svg"));
+    assert!(favicon.contains("core-glow"));
+    assert!(logo.contains("<svg"));
+    assert!(logo.contains("Exa"));
+    assert!(logo.contains("Vault"));
+    assert!(logo.contains("CRYPTOGRAPHIC SECRET ENGINE"));
+}

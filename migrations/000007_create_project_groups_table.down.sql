@@ -10,3 +10,4 @@ WHERE p.group_id = g.id;
 -- Drop foreign key and groups table
 ALTER TABLE projects DROP COLUMN IF EXISTS group_id;
 DROP TABLE IF EXISTS project_groups;
+

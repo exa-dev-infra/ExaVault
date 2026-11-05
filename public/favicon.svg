@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <!-- Background Gradient for Icon / Favicon -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181b" />
+      <stop offset="100%" stop-color="#09090b" />
+    </linearGradient>
+
+    <!-- Facet Gradients -->
+    <linearGradient id="facet-top" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+
+    <linearGradient id="facet-left" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <linearGradient id="facet-right" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#6d28d9" />
+    </linearGradient>
+
+    <!-- Glowing Core Accent -->
+    <linearGradient id="core-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#c084fc" />
+    </linearGradient>
+
+    <!-- Subtle Drop Shadow & Glow Filters -->
+    <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="vault-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#8b5cf6" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Outer Isometric Cube / Vault Node -->
+  <g filter="url(#vault-shadow)">
+    <!-- Top Face -->
+    <path d="M 100,22 L 168,61 L 100,100 L 32,61 Z"
+          fill="url(#facet-top)"
+          stroke="#c084fc"
+          stroke-width="1.5"
+          stroke-linejoin="round" />
+
+    <!-- Left Face -->
+    <path d="M 32,61 L 100,100 L 100,178 L 32,139 Z"
+          fill="url(#facet-left)"
+          stroke="#60a5fa"
+          stroke-width="1.5"
+          stroke-linejoin="round" />
+
+    <!-- Right Face -->
+    <path d="M 100,100 L 168,61 L 168,139 L 100,178 Z"
+          fill="url(#facet-right)"
+          stroke="#a78bfa"
+          stroke-width="1.5"
+          stroke-linejoin="round" />
+  </g>
+
+  <!-- High-Tech Circuit Seams on Facets -->
+  <g stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5" stroke-linecap="round">
+    <!-- Top circuit line -->
+    <path d="M 66,41 L 100,60 L 134,41" />
+    <!-- Left circuit line -->
+    <path d="M 54,98 L 66,105 L 66,145" />
+    <!-- Right circuit line -->
+    <path d="M 146,98 L 134,105 L 134,145" />
+  </g>
+
+  <!-- Central Vault Dial Outer Bezel -->
+  <circle cx="100" cy="100" r="38"
+          fill="#0f172a"
+          stroke="url(#core-glow)"
+          stroke-width="3"
+          filter="url(#neon-glow)" />
+
+  <circle cx="100" cy="100" r="32"
+          fill="#090d16"
+          stroke="#8b5cf6"
+          stroke-width="1.5"
+          stroke-dasharray="6 3" />
+
+  <!-- Cryptographic Vault Mechanism: Stylized 'E' and 'V' Cypher Glyph -->
+  <!-- 'E' Crossbars & 'V' Shield Chevron -->
+  <g fill="none" stroke="url(#core-glow)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Outer Shield V -->
+    <path d="M 82,90 L 100,122 L 118,90" stroke-width="3.5" />
+    <!-- Core Lock Shackle / Inner Bolt -->
+    <path d="M 92,86 L 108,86" stroke-width="3" />
+    <path d="M 94,98 L 106,98" stroke-width="3" />
+    <circle cx="100" cy="108" r="3.5" fill="#38bdf8" />
+  </g>
+
+  <!-- Central Energy Sparkle / Keyhole -->
+  <circle cx="100" cy="100" r="2.5" fill="#ffffff" filter="url(#neon-glow)" />
+</svg>

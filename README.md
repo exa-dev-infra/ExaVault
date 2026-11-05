@@ -1,8 +1,11 @@
-# ⚡ ExaVault
+<p align="center">
+  <img src="public/logo.svg" alt="ExaVault Logo" width="380" />
+</p>
 
-Lightweight, self-hosted `.env` and secret management web application, CLI, and MCP server built in **100% Pure Rust** (Axum, SQLx PostgreSQL, Askama, AES-256-GCM, and Tokio).
-
-> **Core Purpose:** Securely back up and synchronize environment variables across `dev`, `staging`, and `prod` environments without needing to open the web application every time—pull directly via `curl`, built-in CLI, or Model Context Protocol (MCP) in AI assistants like Antigravity, Cursor, and Claude Code.
+<p align="center">
+  <strong>Lightweight, self-hosted secret &amp; .env management engine for high-velocity developer teams.</strong><br>
+  Built with 100% Pure Rust &bull; AES-256-GCM &bull; Model Context Protocol (MCP) &bull; Askama &bull; PostgreSQL
+</p>
 
 ---
 

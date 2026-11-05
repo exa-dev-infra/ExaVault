@@ -29,3 +29,4 @@ WHERE p.group_name = g.name;
 
 -- 5. Drop redundant loose text column group_name
 ALTER TABLE projects DROP COLUMN IF EXISTS group_name;
+

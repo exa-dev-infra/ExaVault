@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{
     extract::State,
-    response::Redirect,
+    response::{IntoResponse, Redirect},
     routing::get,
     Router,
 };
@@ -11,6 +11,9 @@ use crate::{
     modules::vault::handler::VaultContext,
     pkg::crypto::verify_jwt,
 };
+
+const FAVICON_SVG: &str = include_str!("../../../public/favicon.svg");
+const LOGO_SVG: &str = include_str!("../../../public/logo.svg");
 
 #[derive(Template)]
 #[template(path = "login.html")]
@@ -58,10 +61,33 @@ pub async fn dashboard_view(
     Ok(DashboardTemplate {})
 }
 
+pub async fn favicon_handler() -> impl IntoResponse {
+    (
+        [
+            ("content-type", "image/svg+xml"),
+            ("cache-control", "public, max-age=86400"),
+        ],
+        FAVICON_SVG,
+    )
+}
+
+pub async fn logo_handler() -> impl IntoResponse {
+    (
+        [
+            ("content-type", "image/svg+xml"),
+            ("cache-control", "public, max-age=86400"),
+        ],
+        LOGO_SVG,
+    )
+}
+
 pub fn web_router(ctx: VaultContext) -> Router {
     Router::new()
         .route("/", get(root_redirect))
         .route("/login", get(login_view))
         .route("/dashboard", get(dashboard_view))
+        .route("/favicon.svg", get(favicon_handler))
+        .route("/favicon.ico", get(favicon_handler))
+        .route("/logo.svg", get(logo_handler))
         .with_state(ctx)
 }

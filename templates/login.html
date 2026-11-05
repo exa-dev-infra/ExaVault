@@ -32,13 +32,43 @@
              }
          }">
         
-        <div class="flex items-center gap-3 mb-8">
-            <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500 font-bold text-xl">
-                ⚡
+        <div class="flex items-center gap-3.5 mb-8">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500/20 to-blue-500/10 border border-brand-500/30 flex items-center justify-center p-1.5 shadow-lg shadow-brand-500/10">
+                <svg class="w-full h-full drop-shadow" viewBox="0 0 200 200" fill="none">
+                    <defs>
+                        <linearGradient id="login-top" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#a855f7" />
+                            <stop offset="100%" stop-color="#7c3aed" />
+                        </linearGradient>
+                        <linearGradient id="login-left" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6" />
+                            <stop offset="100%" stop-color="#1d4ed8" />
+                        </linearGradient>
+                        <linearGradient id="login-right" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#8b5cf6" />
+                            <stop offset="100%" stop-color="#6d28d9" />
+                        </linearGradient>
+                        <linearGradient id="login-core" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#38bdf8" />
+                            <stop offset="100%" stop-color="#c084fc" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M 100,22 L 168,61 L 100,100 L 32,61 Z" fill="url(#login-top)" stroke="#c084fc" stroke-width="2" />
+                    <path d="M 32,61 L 100,100 L 100,178 L 32,139 Z" fill="url(#login-left)" stroke="#60a5fa" stroke-width="2" />
+                    <path d="M 100,100 L 168,61 L 168,139 L 100,178 Z" fill="url(#login-right)" stroke="#a78bfa" stroke-width="2" />
+                    <circle cx="100" cy="100" r="36" fill="#090d16" stroke="url(#login-core)" stroke-width="3" />
+                    <circle cx="100" cy="100" r="30" fill="#090d16" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="6 3" />
+                    <path d="M 82,90 L 100,122 L 118,90" stroke="url(#login-core)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 92,86 L 108,86" stroke="url(#login-core)" stroke-width="3" stroke-linecap="round" />
+                    <path d="M 94,98 L 106,98" stroke="url(#login-core)" stroke-width="3" stroke-linecap="round" />
+                    <circle cx="100" cy="108" r="3" fill="#38bdf8" />
+                </svg>
             </div>
             <div>
-                <h1 class="text-xl font-bold tracking-tight text-white">ExaVault</h1>
-                <p class="text-xs text-zinc-400">Self-hosted Secret & .env Management</p>
+                <h1 class="text-2xl font-black tracking-tight text-white flex items-center">
+                    <span>Exa</span><span class="bg-gradient-to-r from-brand-400 via-purple-300 to-cyan-400 bg-clip-text text-transparent">Vault</span>
+                </h1>
+                <p class="text-xs text-zinc-400 font-medium">Self-hosted Secret & .env Management</p>
             </div>
         </div>
 

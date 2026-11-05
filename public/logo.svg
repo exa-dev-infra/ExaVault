@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" fill="none">
+  <defs>
+    <!-- Facet Gradients -->
+    <linearGradient id="logo-top" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+
+    <linearGradient id="logo-left" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <linearGradient id="logo-right" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#6d28d9" />
+    </linearGradient>
+
+    <!-- Glowing Core Accent -->
+    <linearGradient id="logo-core" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#c084fc" />
+    </linearGradient>
+
+    <!-- Text Gradient for 'Vault' -->
+    <linearGradient id="brand-text-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="50%" stop-color="#c084fc" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+
+    <filter id="logo-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#8b5cf6" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- LOGOMARK EMBLEM (Scaled at x=60, y=60, radius=48) -->
+  <g transform="translate(10, 10) scale(0.5)" filter="url(#logo-shadow)">
+    <!-- Top Face -->
+    <path d="M 100,22 L 168,61 L 100,100 L 32,61 Z"
+          fill="url(#logo-top)"
+          stroke="#c084fc"
+          stroke-width="2"
+          stroke-linejoin="round" />
+
+    <!-- Left Face -->
+    <path d="M 32,61 L 100,100 L 100,178 L 32,139 Z"
+          fill="url(#logo-left)"
+          stroke="#60a5fa"
+          stroke-width="2"
+          stroke-linejoin="round" />
+
+    <!-- Right Face -->
+    <path d="M 100,100 L 168,61 L 168,139 L 100,178 Z"
+          fill="url(#logo-right)"
+          stroke="#a78bfa"
+          stroke-width="2"
+          stroke-linejoin="round" />
+
+    <!-- High-Tech Circuit Seams -->
+    <g stroke="#ffffff" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round">
+      <path d="M 66,41 L 100,60 L 134,41" />
+      <path d="M 54,98 L 66,105 L 66,145" />
+      <path d="M 146,98 L 134,105 L 134,145" />
+    </g>
+
+    <!-- Central Vault Bezel -->
+    <circle cx="100" cy="100" r="38"
+            fill="#090d16"
+            stroke="url(#logo-core)"
+            stroke-width="3.5" />
+
+    <circle cx="100" cy="100" r="32"
+            fill="#090d16"
+            stroke="#8b5cf6"
+            stroke-width="1.5"
+            stroke-dasharray="6 3" />
+
+    <!-- EV Glyph -->
+    <g fill="none" stroke="url(#logo-core)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 82,90 L 100,122 L 118,90" stroke-width="4" />
+      <path d="M 92,86 L 108,86" stroke-width="3.5" />
+      <path d="M 94,98 L 106,98" stroke-width="3.5" />
+      <circle cx="100" cy="108" r="4" fill="#38bdf8" />
+    </g>
+    <circle cx="100" cy="100" r="3" fill="#ffffff" />
+  </g>
+
+  <!-- WORDMARK & TYPOGRAPHY -->
+  <g transform="translate(130, 0)">
+    <text x="0" y="70" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif" font-weight="900" font-size="52" letter-spacing="-1.5px">
+      <tspan fill="#ffffff">Exa</tspan><tspan fill="url(#brand-text-grad)">Vault</tspan>
+    </text>
+    <text x="3" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif" font-weight="700" font-size="11" letter-spacing="3.5px" fill="#71717a">
+      CRYPTOGRAPHIC SECRET ENGINE
+    </text>
+  </g>
+</svg>
