@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .controls {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input, select, button, textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-disconnect {
+            background: #dc3545;
+        }
+
+        .btn-disconnect:hover {
+            background: #c82333;
+        }
+
+        .messages {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .message {
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+
+        .message.sent {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .message.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .message-time {
+            color: #6c757d;
+            font-size: 11px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+<h1>🔌 WebSocket Client Test</h1>
+
+<div class="container">
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-label">Messages Received</div>
+            <div class="stat-value" id="msgCount">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Messages Sent</div>
+            <div class="stat-value" id="sentCount">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Connected Time</div>
+            <div class="stat-value" id="connTime">0s</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="wsUrl" placeholder="WebSocket URL"
+               value="ws://localhost:8080/api/v1/realtime/ws">
+        <input type="text" id="userId" placeholder="User ID (optional)" value="user-123">
+        <div class="grid-2">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled class="btn-disconnect">Disconnect</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <h3>📤 Send Message</h3>
+    <div class="controls">
+        <select id="action">
+            <option value="message">Send Message</option>
+            <option value="subscribe">Subscribe to Channel</option>
+            <option value="unsubscribe">Unsubscribe from Channel</option>
+        </select>
+        <input type="text" id="channel" placeholder="Channel name" value="general">
+        <textarea id="messageData" rows="3"
+                  placeholder='Message data (JSON)'>{"text": "Hello from WebSocket!"}</textarea>
+        <button onclick="sendMessage()" id="sendBtn" disabled>Send</button>
+    </div>
+</div>
+
+<div class="container">
+    <h3>📨 Messages</h3>
+    <button onclick="clearMessages()" style="margin-bottom: 10px;">Clear Messages</button>
+    <div id="messages" class="messages"></div>
+</div>
+
+<script>
+    let ws = null;
+    let messageCount = 0;
+    let sentCount = 0;
+    let connectTime = null;
+    let timeInterval = null;
+
+    function updateStatus(connected) {
+        const status = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+
+        if (connected) {
+            status.textContent = 'Connected';
+            status.className = 'status connected';
+            connectBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            sendBtn.disabled = false;
+            connectTime = Date.now();
+            timeInterval = setInterval(updateConnectedTime, 1000);
+        } else {
+            status.textContent = 'Disconnected';
+            status.className = 'status disconnected';
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            sendBtn.disabled = true;
+            if (timeInterval) {
+                clearInterval(timeInterval);
+                timeInterval = null;
+            }
+        }
+    }
+
+    function updateConnectedTime() {
+        if (connectTime) {
+            const seconds = Math.floor((Date.now() - connectTime) / 1000);
+            document.getElementById('connTime').textContent = seconds + 's';
+        }
+    }
+
+    function addMessage(text, type = 'received') {
+        const messages = document.getElementById('messages');
+        const message = document.createElement('div');
+        message.className = 'message ' + type;
+
+        const time = new Date().toLocaleTimeString();
+        message.innerHTML = `<div class="message-time">${time}</div><div>${text}</div>`;
+
+        messages.appendChild(message);
+        messages.scrollTop = messages.scrollHeight;
+
+        if (type === 'received') {
+            messageCount++;
+            document.getElementById('msgCount').textContent = messageCount;
+        } else if (type === 'sent') {
+            sentCount++;
+            document.getElementById('sentCount').textContent = sentCount;
+        }
+    }
+
+    function connect() {
+        const url = document.getElementById('wsUrl').value;
+        const userId = document.getElementById('userId').value;
+        const fullUrl = userId ? `${url}?user_id=${userId}` : url;
+
+        try {
+            ws = new WebSocket(fullUrl);
+
+            ws.onopen = (event) => {
+                updateStatus(true);
+                addMessage('✅ Connected to WebSocket server', 'sent');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(`<strong>Type:</strong> ${data.type}<br>` +
+                        `<strong>Channel:</strong> ${data.channel || 'N/A'}<br>` +
+                        `<strong>Data:</strong> <pre>${JSON.stringify(data.data, null, 2)}</pre>`, 'received');
+                } catch (e) {
+                    addMessage(event.data, 'received');
+                }
+            };
+
+            ws.onerror = (error) => {
+                addMessage(`❌ WebSocket error: ${error.message || 'Unknown error'}`, 'error');
+            };
+
+            ws.onclose = (event) => {
+                updateStatus(false);
+                addMessage(`⚠️ Connection closed (code: ${event.code})`, 'error');
+            };
+        } catch (error) {
+            addMessage(`❌ Connection failed: ${error.message}`, 'error');
+        }
+    }
+
+    function disconnect() {
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+    }
+
+    function sendMessage() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert('Not connected to WebSocket');
+            return;
+        }
+
+        const action = document.getElementById('action').value;
+        const channel = document.getElementById('channel').value;
+        const dataText = document.getElementById('messageData').value;
+
+        let message = {
+            action: action,
+            channel: channel
+        };
+
+        if (action === 'message') {
+            try {
+                message.data = JSON.parse(dataText);
+            } catch (e) {
+                message.data = {text: dataText};
+            }
+        }
+
+        try {
+            ws.send(JSON.stringify(message));
+            addMessage(`📤 Sent: ${action} to channel "${channel}"<br>` +
+                `<pre>${JSON.stringify(message, null, 2)}</pre>`, 'sent');
+        } catch (error) {
+            addMessage(`❌ Send failed: ${error.message}`, 'error');
+        }
+    }
+
+    function clearMessages() {
+        document.getElementById('messages').innerHTML = '';
+        messageCount = 0;
+        sentCount = 0;
+        document.getElementById('msgCount').textContent = '0';
+        document.getElementById('sentCount').textContent = '0';
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (ws) {
+            ws.close();
+        }
+    });
+</script>
+</body>
+</html>

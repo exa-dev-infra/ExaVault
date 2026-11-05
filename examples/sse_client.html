@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Client Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .controls {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input, button, textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-disconnect {
+            background: #dc3545;
+        }
+
+        .btn-disconnect:hover {
+            background: #c82333;
+        }
+
+        .btn-send {
+            background: #28a745;
+        }
+
+        .btn-send:hover {
+            background: #218838;
+        }
+
+        .messages {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .message {
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+
+        .message.connected {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .message.notification {
+            border-left-color: #ffc107;
+            background: #fffbf0;
+        }
+
+        .message.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .message.system {
+            border-left-color: #6c757d;
+            background: #f8f9fa;
+            font-style: italic;
+        }
+
+        .message-time {
+            color: #6c757d;
+            font-size: 11px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        pre {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+<h1>📡 SSE (Server-Sent Events) Client Test</h1>
+
+<div class="container">
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-label">Events Received</div>
+            <div class="stat-value" id="eventCount">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Connected Time</div>
+            <div class="stat-value" id="connTime">0s</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Client ID</div>
+            <div class="stat-value" id="clientId" style="font-size: 12px;">-</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="sseUrl" placeholder="SSE URL"
+               value="http://localhost:8080/api/v1/realtime/sse">
+        <div class="grid-2">
+            <button id="connectBtn" onclick="connect()">Connect to SSE</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled class="btn-disconnect">Disconnect</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <h3>📤 Send Broadcast (requires authentication)</h3>
+    <div class="controls">
+        <input type="text" id="authToken" placeholder="Bearer Token (optional)">
+        <input type="text" id="broadcastUrl" placeholder="Broadcast API URL"
+               value="http://localhost:8080/api/v1/realtime/broadcast">
+        <input type="text" id="channel" placeholder="Channel name" value="general">
+        <input type="text" id="eventType" placeholder="Event type" value="message">
+        <textarea id="eventData" rows="3"
+                  placeholder='Event data (JSON)'>{"text": "Hello from SSE!", "timestamp": ""}</textarea>
+        <button onclick="sendBroadcast()" class="btn-send">Send Broadcast</button>
+    </div>
+</div>
+
+<div class="container">
+    <h3>📨 Events</h3>
+    <div style="margin-bottom: 10px;">
+        <button onclick="clearMessages()">Clear Events</button>
+        <button onclick="toggleAutoScroll()" id="autoScrollBtn" style="margin-left: 10px;">Auto-scroll: ON</button>
+    </div>
+    <div id="messages" class="messages"></div>
+</div>
+
+<script>
+    let eventSource = null;
+    let eventCount = 0;
+    let connectTime = null;
+    let timeInterval = null;
+    let autoScroll = true;
+
+    function updateStatus(connected) {
+        const status = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+
+        if (connected) {
+            status.textContent = 'Connected';
+            status.className = 'status connected';
+            connectBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            connectTime = Date.now();
+            timeInterval = setInterval(updateConnectedTime, 1000);
+        } else {
+            status.textContent = 'Disconnected';
+            status.className = 'status disconnected';
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            if (timeInterval) {
+                clearInterval(timeInterval);
+                timeInterval = null;
+            }
+        }
+    }
+
+    function updateConnectedTime() {
+        if (connectTime) {
+            const seconds = Math.floor((Date.now() - connectTime) / 1000);
+            document.getElementById('connTime').textContent = seconds + 's';
+        }
+    }
+
+    function addMessage(text, type = 'message') {
+        const messages = document.getElementById('messages');
+        const message = document.createElement('div');
+        message.className = 'message ' + type;
+
+        const time = new Date().toLocaleTimeString();
+        message.innerHTML = `<div class="message-time">${time} [${type}]</div><div>${text}</div>`;
+
+        messages.appendChild(message);
+
+        if (autoScroll) {
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        eventCount++;
+        document.getElementById('eventCount').textContent = eventCount;
+    }
+
+    function connect() {
+        const url = document.getElementById('sseUrl').value;
+
+        try {
+            eventSource = new EventSource(url);
+
+            eventSource.addEventListener('open', (event) => {
+                updateStatus(true);
+                addMessage('✅ Connected to SSE server', 'connected');
+            });
+
+            // Handle connected event
+            eventSource.addEventListener('connected', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    document.getElementById('clientId').textContent = data.client_id || 'N/A';
+                    addMessage(`<strong>Connected Event:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`, 'connected');
+                } catch (e) {
+                    addMessage(event.data, 'connected');
+                }
+            });
+
+            // Handle message events
+            eventSource.addEventListener('message', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(`<strong>Message Event:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`, 'message');
+                } catch (e) {
+                    addMessage(event.data, 'message');
+                }
+            });
+
+            // Handle notification events
+            eventSource.addEventListener('notification', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(`<strong>🔔 Notification:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`, 'notification');
+                } catch (e) {
+                    addMessage(event.data, 'notification');
+                }
+            });
+
+            // Handle update events
+            eventSource.addEventListener('update', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(`<strong>🔄 Update:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`, 'message');
+                } catch (e) {
+                    addMessage(event.data, 'message');
+                }
+            });
+
+            // Handle custom event types dynamically
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(`<strong>Generic Event:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`, 'message');
+                } catch (e) {
+                    addMessage(event.data, 'message');
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    updateStatus(false);
+                    addMessage('⚠️ SSE connection closed', 'error');
+                } else {
+                    addMessage(`❌ SSE error occurred`, 'error');
+                }
+            };
+
+        } catch (error) {
+            addMessage(`❌ Connection failed: ${error.message}`, 'error');
+        }
+    }
+
+    function disconnect() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+            updateStatus(false);
+            addMessage('🔌 Manually disconnected', 'system');
+        }
+    }
+
+    async function sendBroadcast() {
+        const url = document.getElementById('broadcastUrl').value;
+        const token = document.getElementById('authToken').value;
+        const channel = document.getElementById('channel').value;
+        const type = document.getElementById('eventType').value;
+        const dataText = document.getElementById('eventData').value;
+
+        let data;
+        try {
+            data = JSON.parse(dataText);
+            // Add timestamp if empty
+            if (data.timestamp === "") {
+                data.timestamp = new Date().toISOString();
+            }
+        } catch (e) {
+            data = {text: dataText};
+        }
+
+        const payload = {
+            channel: channel,
+            type: type,
+            data: data
+        };
+
+        try {
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            if (token) {
+                headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+            }
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                addMessage(`✅ Broadcast sent successfully<pre>${JSON.stringify(result, null, 2)}</pre>`, 'connected');
+            } else {
+                addMessage(`❌ Broadcast failed: ${result.message || 'Unknown error'}<pre>${JSON.stringify(result, null, 2)}</pre>`, 'error');
+            }
+        } catch (error) {
+            addMessage(`❌ Request failed: ${error.message}`, 'error');
+        }
+    }
+
+    function clearMessages() {
+        document.getElementById('messages').innerHTML = '';
+        eventCount = 0;
+        document.getElementById('eventCount').textContent = '0';
+    }
+
+    function toggleAutoScroll() {
+        autoScroll = !autoScroll;
+        const btn = document.getElementById('autoScrollBtn');
+        btn.textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
+        btn.style.background = autoScroll ? '#28a745' : '#6c757d';
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
+
+    // Auto-fill timestamp
+    setInterval(() => {
+        const textarea = document.getElementById('eventData');
+        if (textarea.value.includes('"timestamp": ""')) {
+            // Don't auto-update if user is typing
+        }
+    }, 1000);
+</script>
+</body>
+</html>

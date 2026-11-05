@@ -1,0 +1,769 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ExaVault{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col min-h-screen"
+     x-data="vaultApp()"
+     x-init="initApp()"
+     x-cloak>
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-dark-900 border-b border-dark-800 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30">
+        <div class="flex items-center gap-6">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500 font-bold text-base">
+                    ⚡
+                </div>
+                <span class="font-bold text-white text-base tracking-tight">ExaVault</span>
+            </div>
+
+            <!-- Project Selector Dropdown -->
+            <div class="relative" x-data="{ open: false }">
+                <button @click="open = !open"
+                        class="flex items-center gap-2 bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                    <span class="text-zinc-400 text-xs">Project:</span>
+                    <span class="text-zinc-100" x-text="currentProject ? currentProject.name : 'Select Project'"></span>
+                    <span class="text-zinc-500 text-xs">▼</span>
+                </button>
+
+                <div x-show="open" @click.away="open = false"
+                     class="absolute top-full left-0 mt-2 w-64 bg-dark-900 border border-dark-800 rounded-xl shadow-2xl p-1.5 z-40">
+                    <div class="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Projects</div>
+                    <template x-for="p in projects" :key="p.id">
+                        <button @click="selectProject(p); open = false"
+                                class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between hover:bg-dark-800 transition-colors"
+                                :class="currentProject && currentProject.id === p.id ? 'bg-dark-800 text-brand-400 font-medium' : 'text-zinc-300'">
+                            <span x-text="p.name"></span>
+                            <span class="text-xs text-zinc-500" x-text="p.slug"></span>
+                        </button>
+                    </template>
+                    <div class="border-t border-dark-800 my-1"></div>
+                    <button @click="showNewProjectModal = true; open = false"
+                            class="w-full text-left px-3 py-2 rounded-lg text-sm text-brand-400 hover:bg-dark-800 flex items-center gap-2 transition-colors">
+                        <span>＋</span>
+                        <span>Create New Project</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Environment Selector Tabs -->
+            <div class="flex items-center bg-dark-850 p-1 rounded-lg border border-dark-800">
+                <template x-for="env in environments" :key="env.id">
+                    <button @click="selectEnvironment(env)"
+                            class="px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5"
+                            :class="currentEnv && currentEnv.id === env.id 
+                                ? 'bg-dark-800 text-white shadow-sm border border-zinc-700/50' 
+                                : 'text-zinc-400 hover:text-zinc-200'">
+                        <span class="w-1.5 h-1.5 rounded-full"
+                              :class="{
+                                  'bg-emerald-400': env.slug === 'dev',
+                                  'bg-amber-400': env.slug === 'staging',
+                                  'bg-rose-400': env.slug === 'prod',
+                                  'bg-brand-400': !['dev', 'staging', 'prod'].includes(env.slug)
+                              }"></span>
+                        <span x-text="env.name"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Right User Actions -->
+        <div class="flex items-center gap-3">
+            <button @click="openTokensModal()"
+                    class="bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition-colors flex items-center gap-2">
+                <span>🔑 Service Tokens</span>
+                <span class="bg-dark-800 text-zinc-400 px-1.5 py-0.5 rounded text-[10px]" x-text="tokens.length"></span>
+            </button>
+
+            <button @click="logout()"
+                    class="text-zinc-400 hover:text-zinc-200 text-xs px-2.5 py-1.5 rounded-lg hover:bg-dark-850 transition-colors">
+                Sign Out
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-5">
+        
+        <!-- Controls & Mode Switcher Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-dark-900 border border-dark-800 p-3.5 rounded-xl">
+            <div class="flex items-center gap-3">
+                <!-- View Mode Toggle -->
+                <div class="flex items-center bg-dark-850 p-1 rounded-lg border border-dark-800 text-xs">
+                    <button @click="viewMode = 'table'"
+                            class="px-3 py-1.5 rounded-md font-medium transition-all"
+                            :class="viewMode === 'table' ? 'bg-dark-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'">
+                        Table Editor
+                    </button>
+                    <button @click="viewMode = 'raw'; syncTableToRaw()"
+                            class="px-3 py-1.5 rounded-md font-medium transition-all"
+                            :class="viewMode === 'raw' ? 'bg-dark-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'">
+                        Raw .env Bulk Mode
+                    </button>
+                </div>
+
+                <!-- Live Search / Filter (in table mode) -->
+                <div x-show="viewMode === 'table'" class="relative">
+                    <input type="text" x-model="searchFilter" placeholder="Filter variables..."
+                           class="bg-dark-850 border border-dark-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-500 w-56">
+                    <span class="absolute left-2.5 top-2 text-xs text-zinc-500">🔍</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2.5">
+                <button x-show="viewMode === 'table'" @click="addSecretRow()"
+                        class="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <span>＋</span>
+                    <span>Add Variable</span>
+                </button>
+
+                <button @click="downloadEnvFile()"
+                        class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-zinc-300 hover:text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <span>📥</span>
+                    <span>Download .env</span>
+                </button>
+
+                <button @click="saveSecrets()" :disabled="!isDirty || isSaving"
+                        class="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-brand-500/20">
+                    <span x-show="!isSaving">Save Changes</span>
+                    <span x-show="isSaving">Saving...</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Unsaved Changes Warning Banner -->
+        <template x-if="isDirty">
+            <div class="bg-amber-950/40 border border-amber-800/60 rounded-xl px-4 py-2.5 flex items-center justify-between text-amber-300 text-xs">
+                <div class="flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span>You have unsaved changes. Remember to click <strong>Save Changes</strong> before leaving.</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button @click="discardChanges()" class="underline hover:text-amber-100">Discard</button>
+                    <button @click="saveSecrets()" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-1 rounded text-xs">Save</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- View 1: Key-Value Table View -->
+        <div x-show="viewMode === 'table'" class="bg-dark-900 border border-dark-800 rounded-xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-dark-850/70 border-b border-dark-800 text-zinc-400 text-xs uppercase font-medium">
+                        <tr>
+                            <th class="px-4 py-3 w-1/4">Key</th>
+                            <th class="px-4 py-3 w-2/5">Value</th>
+                            <th class="px-4 py-3 w-1/4">Comment</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-dark-800 font-mono text-xs">
+                        <template x-for="(s, index) in filteredSecrets" :key="index">
+                            <tr class="hover:bg-dark-850/40 transition-colors">
+                                <!-- Key Input -->
+                                <td class="px-4 py-2.5">
+                                    <input type="text" x-model="s.key" @input="isDirty = true" placeholder="KEY_NAME"
+                                           class="w-full bg-transparent border-b border-transparent hover:border-dark-800 focus:border-brand-500 focus:outline-none text-zinc-100 font-semibold px-1 py-1">
+                                </td>
+
+                                <!-- Value Input with Mask/Unmask -->
+                                <td class="px-4 py-2.5">
+                                    <div class="flex items-center gap-2 bg-dark-850 border border-dark-800 rounded-lg px-2.5 py-1">
+                                        <input :type="s.masked ? 'password' : 'text'" x-model="s.value" @input="isDirty = true" placeholder="Secret value..."
+                                               class="w-full bg-transparent focus:outline-none text-zinc-200 font-mono text-xs">
+                                        <button type="button" @click="s.masked = !s.masked"
+                                                class="text-zinc-500 hover:text-zinc-300 text-xs px-1" title="Toggle Visibility">
+                                            <span x-text="s.masked ? '👁️' : '🙈'"></span>
+                                        </button>
+                                        <button type="button" @click="copyToClipboard(s.value, 'Value copied!')"
+                                                class="text-zinc-500 hover:text-zinc-300 text-xs px-1" title="Copy Value">
+                                            📋
+                                        </button>
+                                    </div>
+                                </td>
+
+                                <!-- Comment Input -->
+                                <td class="px-4 py-2.5 font-sans">
+                                    <input type="text" x-model="s.comment" @input="isDirty = true" placeholder="Optional comment..."
+                                           class="w-full bg-transparent border-b border-transparent hover:border-dark-800 focus:border-brand-500 focus:outline-none text-zinc-400 text-xs px-1 py-1">
+                                </td>
+
+                                <!-- Actions -->
+                                <td class="px-4 py-2.5 text-right font-sans">
+                                    <button @click="deleteSecretRow(index)"
+                                            class="text-zinc-500 hover:text-rose-400 text-xs p-1 rounded hover:bg-rose-950/30 transition-colors" title="Delete Variable">
+                                        🗑️
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+
+                        <template x-if="filteredSecrets.length === 0">
+                            <tr>
+                                <td colspan="4" class="px-4 py-12 text-center text-zinc-500 font-sans">
+                                    <p class="text-sm">No variables found in this environment.</p>
+                                    <button @click="addSecretRow()" class="mt-2 text-xs text-brand-400 hover:underline">
+                                        + Add the first variable
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Bottom Footer -->
+            <div class="bg-dark-850/40 border-t border-dark-800 p-3 flex items-center justify-between text-xs text-zinc-500">
+                <span x-text="`${secrets.length} secret variables loaded`"></span>
+                <button @click="addSecretRow()" class="text-brand-400 hover:text-brand-300 font-medium">
+                    ＋ Add Row
+                </button>
+            </div>
+        </div>
+
+        <!-- View 2: Raw .env Bulk Mode -->
+        <div x-show="viewMode === 'raw'" class="bg-dark-900 border border-dark-800 rounded-xl p-4 flex flex-col gap-3 shadow-xl">
+            <div class="flex items-center justify-between text-xs text-zinc-400 pb-2 border-b border-dark-800">
+                <span>Paste or edit raw .env text. Comments (#) and multiline strings are supported.</span>
+                <div class="flex items-center gap-2">
+                    <button @click="copyToClipboard(rawEnvText, 'Entire .env copied!')"
+                            class="hover:text-white px-2 py-1 bg-dark-850 border border-dark-800 rounded">
+                        📋 Copy Raw Text
+                    </button>
+                    <button @click="syncRawToTable()"
+                            class="hover:text-white px-2 py-1 bg-dark-800 border border-zinc-700 text-brand-400 rounded">
+                        🔄 Parse to Table
+                    </button>
+                </div>
+            </div>
+
+            <textarea x-model="rawEnvText" @input="isDirty = true" rows="18"
+                      class="w-full bg-dark-950 border border-dark-800 rounded-lg p-4 font-mono text-xs text-zinc-200 focus:outline-none focus:border-brand-500 leading-relaxed resize-y"
+                      placeholder="KEY_NAME=value&#10;# comment&#10;DATABASE_URL=&quot;postgres://...&quot;"></textarea>
+        </div>
+
+    </main>
+
+    <!-- Modal 1: Service Tokens & Snippets -->
+    <div x-show="showTokensModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div @click.away="showTokensModal = false"
+             class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <div class="px-6 py-4 border-b border-dark-800 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-white text-base">Service Tokens</h3>
+                    <p class="text-xs text-zinc-400">Scoped machine access for CI/CD, containers, and CLI export</p>
+                </div>
+                <button @click="showTokensModal = false" class="text-zinc-400 hover:text-zinc-200 text-lg">✕</button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex flex-col gap-6">
+                <!-- Create Token Form -->
+                <div class="bg-dark-850 border border-dark-800 rounded-xl p-4 flex flex-col gap-3">
+                    <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Generate New Token</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-[11px] text-zinc-400 mb-1">Token Name</label>
+                            <input type="text" x-model="newTokenName" placeholder="e.g. GitHub Actions, Prod Server"
+                                   class="w-full bg-dark-900 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-zinc-400 mb-1">Expiration</label>
+                            <select x-model="newTokenDays"
+                                    class="w-full bg-dark-900 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                                <option value="7">7 Days</option>
+                                <option value="30">30 Days</option>
+                                <option value="90">90 Days</option>
+                                <option value="365">1 Year</option>
+                                <option value="0">Never</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex justify-end mt-1">
+                        <button @click="generateServiceToken()" :disabled="!newTokenName.trim()"
+                                class="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+                            Generate Token
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Existing Tokens List -->
+                <div class="flex flex-col gap-2">
+                    <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Active Tokens</h4>
+                    <div class="divide-y divide-dark-800 border border-dark-800 rounded-xl overflow-hidden bg-dark-950">
+                        <template x-for="t in tokens" :key="t.id">
+                            <div class="p-3.5 flex items-center justify-between text-xs">
+                                <div>
+                                    <div class="font-medium text-zinc-200" x-text="t.name"></div>
+                                    <div class="font-mono text-zinc-500 text-[11px] mt-0.5" x-text="t.token_prefix"></div>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <div class="text-right text-[11px] text-zinc-500">
+                                        <div x-text="t.last_used_at ? 'Used: ' + formatDate(t.last_used_at) : 'Never used'"></div>
+                                        <div x-text="t.expires_at ? 'Expires: ' + formatDate(t.expires_at) : 'No expiration'"></div>
+                                    </div>
+                                    <button @click="revokeToken(t.id)" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded hover:bg-rose-950/30">
+                                        Revoke
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="tokens.length === 0">
+                            <div class="p-6 text-center text-xs text-zinc-500">
+                                No service tokens generated yet.
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: New Token One-Time Reveal & Integration Snippets -->
+    <div x-show="showCreatedTokenModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-dark-900 border border-brand-500/40 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl p-6 gap-5">
+            <div class="flex items-center justify-between pb-3 border-b border-dark-800">
+                <div class="flex items-center gap-2 text-emerald-400">
+                    <span class="text-lg">✅</span>
+                    <h3 class="font-bold text-white text-base">Service Token Created</h3>
+                </div>
+                <button @click="showCreatedTokenModal = false" class="text-zinc-400 hover:text-zinc-200">✕</button>
+            </div>
+
+            <div class="bg-rose-950/50 border border-rose-800/80 rounded-xl p-3 text-rose-300 text-xs flex items-start gap-2">
+                <span>⚠️</span>
+                <span>Copy this token now! For security, it is stored as an irreversible SHA-256 hash and <strong>will never be shown again</strong>.</span>
+            </div>
+
+            <!-- Token Copy Box -->
+            <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Raw Service Token</label>
+                <div class="flex items-center gap-2 bg-dark-950 border border-dark-800 rounded-lg p-2.5">
+                    <input type="text" readonly :value="newlyCreatedToken"
+                           class="w-full bg-transparent font-mono text-xs text-brand-300 focus:outline-none select-all">
+                    <button @click="copyToClipboard(newlyCreatedToken, 'Token copied to clipboard!')"
+                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs px-3 py-1.5 rounded font-medium">
+                        Copy
+                    </button>
+                </div>
+            </div>
+
+            <!-- Ready-to-copy Snippets -->
+            <div class="flex flex-col gap-3 pt-2 border-t border-dark-800">
+                <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Ready Integration Snippets</h4>
+                
+                <!-- Snippet 1: curl to .env -->
+                <div>
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>Direct file pull (CI/CD / New PC):</span>
+                        <button @click="copyToClipboard(getCurlFileSnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
+                    </div>
+                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlFileSnippet()"></pre>
+                </div>
+
+                <!-- Snippet 2: memory injection -->
+                <div>
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>Process memory injection:</span>
+                        <button @click="copyToClipboard(getCurlMemorySnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
+                    </div>
+                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlMemorySnippet()"></pre>
+                </div>
+
+                <!-- Snippet 3: MCP config for AI assistant -->
+                <div>
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>Antigravity / Cursor MCP config snippet:</span>
+                        <button @click="copyToClipboard(getMcpSnippet(), 'MCP config copied!')" class="text-brand-400 hover:underline">Copy</button>
+                    </div>
+                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getMcpSnippet()"></pre>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-dark-800">
+                <button @click="showCreatedTokenModal = false"
+                        class="bg-dark-800 hover:bg-dark-700 text-white text-xs px-4 py-2 rounded-lg font-medium">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: Create Project Modal -->
+    <div x-show="showNewProjectModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div @click.away="showNewProjectModal = false"
+             class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
+            <h3 class="font-bold text-white text-base">Create New Project</h3>
+            
+            <form @submit.prevent="createProject" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">Project Name</label>
+                    <input type="text" x-model="newProjectForm.name" required placeholder="e.g. Cyber Mobile"
+                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">Slug (optional)</label>
+                    <input type="text" x-model="newProjectForm.slug" placeholder="e.g. cyber-mobile"
+                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1">Description (optional)</label>
+                    <textarea x-model="newProjectForm.description" rows="2" placeholder="Brief project description"
+                              class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500"></textarea>
+                </div>
+
+                <p class="text-[11px] text-zinc-500">
+                    💡 Environments <strong>dev</strong>, <strong>staging</strong>, and <strong>prod</strong> will be auto-seeded automatically.
+                </p>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="showNewProjectModal = false"
+                            class="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white">Cancel</button>
+                    <button type="submit"
+                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-1.5 rounded-lg">
+                        Create Project
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<!-- Alpine.js Application Logic -->
+<script>
+function vaultApp() {
+    return {
+        projects: [],
+        currentProject: null,
+        environments: [],
+        currentEnv: null,
+        secrets: [],
+        tokens: [],
+        rawEnvText: '',
+        viewMode: 'table',
+        searchFilter: '',
+        isDirty: false,
+        isSaving: false,
+
+        // Modals
+        showTokensModal: false,
+        showCreatedTokenModal: false,
+        showNewProjectModal: false,
+        newTokenName: '',
+        newTokenDays: '30',
+        newlyCreatedToken: '',
+        newProjectForm: { name: '', slug: '', description: '' },
+
+        async initApp() {
+            await this.loadProjects();
+        },
+
+        get filteredSecrets() {
+            if (!this.searchFilter.trim()) return this.secrets;
+            const q = this.searchFilter.toLowerCase();
+            return this.secrets.filter(s => s.key.toLowerCase().includes(q) || (s.comment && s.comment.toLowerCase().includes(q)));
+        },
+
+        async loadProjects() {
+            try {
+                const res = await fetch('/api/projects');
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                const data = await res.json();
+                this.projects = data.data || [];
+
+                if (this.projects.length > 0) {
+                    this.selectProject(this.projects[0]);
+                }
+            } catch (e) {
+                this.toast('Failed to load projects: ' + e.message, 'error');
+            }
+        },
+
+        selectProject(project) {
+            this.currentProject = project;
+            this.environments = project.environments || [];
+            if (this.environments.length > 0) {
+                this.selectEnvironment(this.environments[0]);
+            } else {
+                this.currentEnv = null;
+                this.secrets = [];
+            }
+        },
+
+        async selectEnvironment(env) {
+            if (this.isDirty && !confirm('You have unsaved changes. Discard and switch environment?')) {
+                return;
+            }
+            this.currentEnv = env;
+            this.isDirty = false;
+            await this.loadSecrets();
+            await this.loadTokens();
+        },
+
+        async loadSecrets() {
+            if (!this.currentEnv) return;
+            try {
+                const res = await fetch(`/api/environments/${this.currentEnv.id}/secrets`);
+                const data = await res.json();
+                const list = data.data || [];
+                this.secrets = list.map(s => ({
+                    id: s.id,
+                    key: s.key,
+                    value: s.value,
+                    comment: s.comment || '',
+                    masked: true
+                }));
+                this.syncTableToRaw();
+                this.isDirty = false;
+            } catch (e) {
+                this.toast('Failed to load secrets: ' + e.message, 'error');
+            }
+        },
+
+        async loadTokens() {
+            if (!this.currentEnv) return;
+            try {
+                const res = await fetch(`/api/environments/${this.currentEnv.id}/tokens`);
+                const data = await res.json();
+                this.tokens = data.data || [];
+            } catch (e) {
+                console.error(e);
+            }
+        },
+
+        addSecretRow() {
+            this.secrets.push({
+                key: '',
+                value: '',
+                comment: '',
+                masked: false
+            });
+            this.isDirty = true;
+            this.syncTableToRaw();
+        },
+
+        deleteSecretRow(index) {
+            this.secrets.splice(index, 1);
+            this.isDirty = true;
+            this.syncTableToRaw();
+        },
+
+        async saveSecrets() {
+            if (!this.currentEnv || this.isSaving) return;
+            this.isSaving = true;
+
+            // If in raw mode, parse first
+            if (this.viewMode === 'raw') {
+                this.syncRawToTable();
+            }
+
+            const payload = this.secrets
+                .filter(s => s.key.trim().length > 0)
+                .map(s => ({
+                    key: s.key.trim(),
+                    value: s.value,
+                    comment: s.comment ? s.comment.trim() : null
+                }));
+
+            try {
+                const res = await fetch(`/api/environments/${this.currentEnv.id}/secrets`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error('Save failed');
+                this.isDirty = false;
+                this.toast('All secrets encrypted and saved successfully!', 'success');
+                await this.loadSecrets();
+            } catch (e) {
+                this.toast('Failed to save secrets: ' + e.message, 'error');
+            } finally {
+                this.isSaving = false;
+            }
+        },
+
+        discardChanges() {
+            this.loadSecrets();
+        },
+
+        syncTableToRaw() {
+            let lines = [];
+            for (const s of this.secrets) {
+                if (s.comment && s.comment.trim()) {
+                    lines.push(`# ${s.comment.trim()}`);
+                }
+                if (s.key && s.key.trim()) {
+                    const escaped = s.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`${s.key.trim()}="${escaped}"`);
+                }
+            }
+            this.rawEnvText = lines.join('\n');
+        },
+
+        syncRawToTable() {
+            const lines = this.rawEnvText.split('\n');
+            const parsed = [];
+            let currentComment = '';
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+
+                if (line.startsWith('#')) {
+                    currentComment = line.substring(1).trim();
+                    continue;
+                }
+
+                const eqIdx = line.indexOf('=');
+                if (eqIdx > 0) {
+                    const key = line.substring(0, eqIdx).trim();
+                    let val = line.substring(eqIdx + 1).trim();
+
+                    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                        val = val.substring(1, val.length - 1);
+                    }
+
+                    parsed.push({
+                        key,
+                        value: val,
+                        comment: currentComment,
+                        masked: true
+                    });
+                    currentComment = '';
+                }
+            }
+
+            this.secrets = parsed;
+            this.isDirty = true;
+        },
+
+        downloadEnvFile() {
+            this.syncTableToRaw();
+            const blob = new Blob([this.rawEnvText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.currentProject ? this.currentProject.slug : 'project'}.${this.currentEnv ? this.currentEnv.slug : 'env'}.env`;
+            a.click();
+            URL.revokeObjectURL(url);
+            this.toast('File downloaded!', 'info');
+        },
+
+        openTokensModal() {
+            this.showTokensModal = true;
+            this.loadTokens();
+        },
+
+        async generateServiceToken() {
+            if (!this.currentEnv || !this.newTokenName.trim()) return;
+            try {
+                const res = await fetch(`/api/environments/${this.currentEnv.id}/tokens`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: this.newTokenName.trim(),
+                        expires_in_days: parseInt(this.newTokenDays) || null
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Token generation failed');
+
+                this.newlyCreatedToken = data.data.token;
+                this.showTokensModal = false;
+                this.showCreatedTokenModal = true;
+                this.newTokenName = '';
+                await this.loadTokens();
+            } catch (e) {
+                this.toast('Token error: ' + e.message, 'error');
+            }
+        },
+
+        async revokeToken(id) {
+            if (!confirm('Are you sure you want to revoke this service token?')) return;
+            try {
+                await fetch(`/api/tokens/${id}`, { method: 'DELETE' });
+                this.toast('Token revoked', 'info');
+                await this.loadTokens();
+            } catch (e) {
+                this.toast('Failed to revoke token', 'error');
+            }
+        },
+
+        async createProject() {
+            try {
+                const res = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.newProjectForm)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Project creation failed');
+
+                this.showNewProjectModal = false;
+                this.newProjectForm = { name: '', slug: '', description: '' };
+                this.toast('Project created with dev, staging, prod!', 'success');
+                await this.loadProjects();
+            } catch (e) {
+                this.toast('Error: ' + e.message, 'error');
+            }
+        },
+
+        getCurlFileSnippet() {
+            const host = window.location.origin;
+            return `curl -fsSL -H "Authorization: Bearer ${this.newlyCreatedToken}" ${host}/api/v1/export > .env`;
+        },
+
+        getCurlMemorySnippet() {
+            const host = window.location.origin;
+            return `export $(curl -fsSL -H "Authorization: Bearer ${this.newlyCreatedToken}" ${host}/api/v1/export | xargs)`;
+        },
+
+        getMcpSnippet() {
+            const host = window.location.origin;
+            return JSON.stringify({
+                "mcpServers": {
+                    "exavault": {
+                        "command": "exavault",
+                        "args": ["mcp"],
+                        "env": {
+                            "EXAVAULT_URL": host,
+                            "EXAVAULT_TOKEN": this.newlyCreatedToken
+                        }
+                    }
+                }
+            }, null, 2);
+        },
+
+        copyToClipboard(text, successMsg) {
+            navigator.clipboard.writeText(text);
+            this.toast(successMsg, 'success');
+        },
+
+        toast(msg, type = 'info') {
+            window.dispatchEvent(new CustomEvent('toast', { detail: { msg, type } }));
+        },
+
+        formatDate(iso) {
+            if (!iso) return '-';
+            const d = new Date(iso);
+            return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        },
+
+        async logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+    };
+}
+</script>
+{% endblock %}
+

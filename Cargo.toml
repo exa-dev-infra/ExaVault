@@ -1,0 +1,60 @@
+[package]
+name = "exavault"
+version = "0.1.0"
+edition = "2021"
+description = "Lightweight, self-hosted .env and secret management web application and MCP server"
+
+[dependencies]
+# Web Framework & Async Runtime
+axum = { version = "0.7.5", features = ["ws", "macros", "multipart", "form"] }
+axum-extra = { version = "0.9.3", features = ["cookie"] }
+tokio = { version = "1.38.0", features = ["full"] }
+tokio-stream = { version = "0.1.15", features = ["sync"] }
+tower = { version = "0.4.13", features = ["util"] }
+tower-http = { version = "0.5.2", features = ["cors", "trace", "request-id", "util", "fs"] }
+futures-util = { version = "0.3.30", default-features = false, features = ["sink", "std"] }
+async-trait = "0.1.80"
+
+# Template Engine
+askama = { version = "0.12.1", features = ["with-axum"] }
+askama_axum = "0.4.0"
+
+# CLI
+clap = { version = "4.5.4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+
+# Database & Migrations
+sqlx = { version = "0.8.0", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "migrate"] }
+redis = { version = "0.27.6", features = ["tokio-comp"] }
+lapin = "2.3.4"
+
+# Serialization & Validation
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
+validator = { version = "0.18.1", features = ["derive"] }
+
+# Structured Logging & Tracing
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["json", "env-filter"] }
+tracing-opentelemetry = "0.28.0"
+opentelemetry = "0.27.1"
+opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic"] }
+
+# Auth, Security & Encryption
+aes-gcm = "0.10.3"
+jsonwebtoken = "9.3.0"
+argon2 = { version = "0.5.3", features = ["std"] }
+sha2 = "0.10.8"
+hex = "0.4.3"
+rand = "0.8.5"
+time = "0.3.36"
+
+# Utilities
+uuid = { version = "1.8.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.38", features = ["serde"] }
+dotenvy = "0.15.7"
+thiserror = "1.0.61"
+
+[dev-dependencies]
+tokio-test = "0.4.4"

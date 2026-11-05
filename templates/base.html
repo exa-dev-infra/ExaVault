@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ExaVault - Secret & .env Manager{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            950: '#09090b',
+                            900: '#121215',
+                            850: '#18181b',
+                            800: '#27272a',
+                            700: '#3f3f46',
+                        },
+                        brand: {
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Alpine.js for lightweight reactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #121215; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    </style>
+</head>
+<body class="bg-dark-950 text-zinc-100 min-h-screen flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+    {% block content %}{% endblock %}
+
+    <!-- Global Toast Notifications -->
+    <div x-data="{ toasts: [] }" 
+         @toast.window="toasts.push({ id: Date.now(), msg: $event.detail.msg, type: $event.detail.type || 'info' }); setTimeout(() => toasts.shift(), 3500)"
+         class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="pointer-events-auto px-4 py-2.5 rounded-lg border text-sm shadow-xl flex items-center gap-2 transition-all duration-200"
+                 :class="{
+                     'bg-zinc-900 border-zinc-700 text-zinc-200': t.type === 'info',
+                     'bg-emerald-950 border-emerald-700 text-emerald-200': t.type === 'success',
+                     'bg-rose-950 border-rose-700 text-rose-200': t.type === 'error'
+                 }">
+                <span x-text="t.msg"></span>
+            </div>
+        </template>
+    </div>
+
+</body>
+</html>
+
