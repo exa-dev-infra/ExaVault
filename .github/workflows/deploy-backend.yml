@@ -1,0 +1,73 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  # ==========================================
+  # 1. CI Quality Gate: Lint & Unit Tests
+  # ==========================================
+  test:
+    name: Test & Lint Backend (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Cargo Check
+        run: cargo check --verbose
+
+      - name: Run Unit Tests
+        run: cargo test --lib --bins --verbose
+
+  # ==========================================
+  # 2. CD Deployment: Reusable Workflow from exa31/github-workflows
+  # ==========================================
+  deploy:
+    name: Build & Deploy Backend
+    needs: test
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    concurrency:
+      group: release-pipeline-${{ github.repository }}
+      cancel-in-progress: false
+    uses: exa31/github-workflows/.github/workflows/backend.yml@v1.0.0
+    with:
+      app_name: exavault
+      namespace: exavault
+      image_name: ghcr.io/exa31/exavault
+      docker_context: .
+      dockerfile: Dockerfile
+      ssh_port: 31080
+      kubeconfig: /home/deploy/.kube/config
+      rollout_timeout: 300s
+      push_latest: true
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
