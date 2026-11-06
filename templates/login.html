@@ -26,6 +26,9 @@
                      window.location.href = '/dashboard';
                  } catch (err) {
                      this.error = err.message;
+                     if (window.toast) {
+                         window.toast(err.message, 'error', 'Authentication Failed');
+                     }
                  } finally {
                      this.loading = false;
                  }

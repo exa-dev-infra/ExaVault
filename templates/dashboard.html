@@ -3,343 +3,584 @@
 {% block title %}Dashboard - ExaVault{% endblock %}
 
 {% block content %}
-<div class="flex-1 flex flex-col min-h-screen"
+<div class="flex min-h-screen bg-dark-950 text-zinc-100 font-sans"
      x-data="vaultApp()"
      x-init="initApp()"
      x-cloak>
 
-    <!-- Top Navigation Bar -->
-    <header class="bg-dark-900 border-b border-dark-800 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30">
-        <div class="flex items-center gap-6">
-            <!-- Brand Logo -->
-            <a href="/dashboard" class="flex items-center gap-2.5 group">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500/20 to-blue-500/10 border border-brand-500/30 flex items-center justify-center p-1 shadow-md shadow-brand-500/10 group-hover:border-brand-500/60 transition-colors">
-                    <svg class="w-full h-full" viewBox="0 0 200 200" fill="none">
-                        <defs>
-                            <linearGradient id="dash-top" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#a855f7" />
-                                <stop offset="100%" stop-color="#7c3aed" />
-                            </linearGradient>
-                            <linearGradient id="dash-left" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#3b82f6" />
-                                <stop offset="100%" stop-color="#1d4ed8" />
-                            </linearGradient>
-                            <linearGradient id="dash-right" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#8b5cf6" />
-                                <stop offset="100%" stop-color="#6d28d9" />
-                            </linearGradient>
-                            <linearGradient id="dash-core" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#38bdf8" />
-                                <stop offset="100%" stop-color="#c084fc" />
-                            </linearGradient>
-                        </defs>
-                        <path d="M 100,22 L 168,61 L 100,100 L 32,61 Z" fill="url(#dash-top)" stroke="#c084fc" stroke-width="2" />
-                        <path d="M 32,61 L 100,100 L 100,178 L 32,139 Z" fill="url(#dash-left)" stroke="#60a5fa" stroke-width="2" />
-                        <path d="M 100,100 L 168,61 L 168,139 L 100,178 Z" fill="url(#dash-right)" stroke="#a78bfa" stroke-width="2" />
-                        <circle cx="100" cy="100" r="36" fill="#090d16" stroke="url(#dash-core)" stroke-width="3" />
-                        <path d="M 82,90 L 100,122 L 118,90" stroke="url(#dash-core)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
-                        <path d="M 92,86 L 108,86" stroke="url(#dash-core)" stroke-width="3" stroke-linecap="round" />
-                        <path d="M 94,98 L 106,98" stroke="url(#dash-core)" stroke-width="3" stroke-linecap="round" />
-                        <circle cx="100" cy="108" r="3" fill="#38bdf8" />
-                    </svg>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="font-extrabold text-white text-base tracking-tight flex items-center">
-                        <span>Exa</span><span class="bg-gradient-to-r from-brand-400 via-purple-300 to-cyan-400 bg-clip-text text-transparent">Vault</span>
-                    </span>
-                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-500/10 border border-brand-500/20 text-brand-300 font-semibold">v0.1.0</span>
-                </div>
-            </a>
+    <!-- Mobile Sidebar Backdrop -->
+    <div x-show="mobileSidebarOpen" 
+         @click="mobileSidebarOpen = false"
+         class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm lg:hidden"
+         x-transition:enter="transition-opacity ease-linear duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-linear duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"></div>
 
-            <!-- Project Selector Dropdown -->
-            <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open"
-                        class="flex items-center gap-2 bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
-                    <span class="text-zinc-400 text-xs">Project:</span>
-                    <span class="text-zinc-100 font-semibold" x-text="currentProject ? (currentProject.group_name ? `${currentProject.group_name} / ${currentProject.name}` : currentProject.name) : 'Select Project'"></span>
-                    <span class="text-zinc-500 text-xs">▼</span>
-                </button>
+    <!-- Modern Dashboard Sidebar (Fixed on Desktop, Drawer on Mobile) -->
+    <aside class="fixed inset-y-0 left-0 z-40 w-72 bg-dark-900 border-r border-dark-800 flex flex-col justify-between transition-transform duration-200 ease-in-out lg:translate-x-0"
+           :class="mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+        
+        <!-- Sidebar Top Area -->
+        <div class="flex flex-col">
+            <!-- Brand Logo Header -->
+            <div class="h-16 px-5 border-b border-dark-800 flex items-center justify-between">
+                <a href="/dashboard" class="flex items-center gap-3 group">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-blue-500/10 border border-brand-500/30 flex items-center justify-center p-1.5 shadow-md shadow-brand-500/10 group-hover:border-brand-500/60 transition-colors">
+                        <svg class="w-full h-full" viewBox="0 0 200 200" fill="none">
+                            <defs>
+                                <linearGradient id="sb-top" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#a855f7" />
+                                    <stop offset="100%" stop-color="#7c3aed" />
+                                </linearGradient>
+                                <linearGradient id="sb-left" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#3b82f6" />
+                                    <stop offset="100%" stop-color="#1d4ed8" />
+                                </linearGradient>
+                                <linearGradient id="sb-right" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#8b5cf6" />
+                                    <stop offset="100%" stop-color="#6d28d9" />
+                                </linearGradient>
+                                <linearGradient id="sb-core" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#38bdf8" />
+                                    <stop offset="100%" stop-color="#c084fc" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M 100,22 L 168,61 L 100,100 L 32,61 Z" fill="url(#sb-top)" stroke="#c084fc" stroke-width="2" />
+                            <path d="M 32,61 L 100,100 L 100,178 L 32,139 Z" fill="url(#sb-left)" stroke="#60a5fa" stroke-width="2" />
+                            <path d="M 100,100 L 168,61 L 168,139 L 100,178 Z" fill="url(#sb-right)" stroke="#a78bfa" stroke-width="2" />
+                            <circle cx="100" cy="100" r="36" fill="#090d16" stroke="url(#sb-core)" stroke-width="3" />
+                            <path d="M 82,90 L 100,122 L 118,90" stroke="url(#sb-core)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M 92,86 L 108,86" stroke="url(#sb-core)" stroke-width="3" stroke-linecap="round" />
+                            <path d="M 94,98 L 106,98" stroke="url(#sb-core)" stroke-width="3" stroke-linecap="round" />
+                            <circle cx="100" cy="108" r="3" fill="#38bdf8" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-black text-white text-base tracking-tight">Exa</span>
+                            <span class="font-black bg-gradient-to-r from-brand-400 via-purple-300 to-cyan-400 bg-clip-text text-transparent text-base tracking-tight">Vault</span>
+                            <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-brand-500/10 border border-brand-500/20 text-brand-300 font-bold ml-1">v0.1</span>
+                        </div>
+                        <p class="text-[10px] text-zinc-500 font-mono">Secret & Env Engine</p>
+                    </div>
+                </a>
+                <button @click="mobileSidebarOpen = false" class="lg:hidden text-zinc-400 hover:text-zinc-200 text-lg p-1">✕</button>
+            </div>
 
-                <div x-show="open" @click.away="open = false"
-                     class="absolute top-full left-0 mt-2 w-72 bg-dark-900 border border-dark-800 rounded-xl shadow-2xl p-2 z-40 max-h-96 overflow-y-auto">
-                    <div class="px-2 py-1 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Ecosystems & Projects</div>
-                    <template x-for="(groupList, groupTitle) in groupedProjects" :key="groupTitle">
-                        <div class="mb-2">
-                            <div class="px-2 py-1 text-[11px] font-semibold text-brand-400 flex items-center gap-1.5">
-                                <span>📁</span>
-                                <span x-text="groupTitle"></span>
+            <!-- Ecosystem & Project Switcher Dropdown -->
+            <div class="p-3 border-b border-dark-800" x-data="{ open: false }">
+                <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 px-1">Selected Application</label>
+                <div class="relative">
+                    <button @click="open = !open"
+                            class="w-full flex items-center justify-between bg-dark-850 hover:bg-dark-800 border border-dark-800 rounded-xl p-2.5 text-left transition-all shadow-sm">
+                        <div class="flex items-center gap-2.5 overflow-hidden">
+                            <div class="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center shrink-0 text-brand-400 text-xs font-bold">
+                                🚀
                             </div>
-                            <div class="pl-2 space-y-0.5">
-                                <template x-for="p in groupList" :key="p.id">
-                                    <button @click="selectProject(p); open = false"
-                                            class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-dark-800 transition-colors"
-                                            :class="currentProject && currentProject.id === p.id ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-300'">
-                                        <span x-text="p.name"></span>
-                                        <span class="text-[10px] text-zinc-500 font-mono" x-text="p.slug"></span>
-                                    </button>
-                                </template>
+                            <div class="overflow-hidden">
+                                <div class="text-[11px] text-zinc-400 font-medium truncate" x-text="currentProject && currentProject.group_name ? currentProject.group_name : 'Standalone'"></div>
+                                <div class="text-xs font-bold text-white truncate" x-text="currentProject ? currentProject.name : 'Select Project'"></div>
                             </div>
                         </div>
+                        <span class="text-zinc-500 text-xs shrink-0 ml-1">▼</span>
+                    </button>
+
+                    <!-- Dropdown Menu -->
+                    <div x-show="open" @click.away="open = false"
+                         class="absolute top-full left-0 right-0 mt-2 bg-dark-900 border border-dark-800 rounded-xl shadow-2xl p-2 z-50 max-h-80 overflow-y-auto">
+                        <div class="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Ecosystems & Microservices</div>
+                        
+                        <template x-for="(groupList, groupTitle) in groupedProjects" :key="groupTitle">
+                            <div class="mb-2">
+                                <div class="px-2 py-1 text-[11px] font-semibold text-brand-400 flex items-center gap-1.5">
+                                    <span>📁</span>
+                                    <span x-text="groupTitle"></span>
+                                </div>
+                                <div class="pl-2 space-y-0.5">
+                                    <template x-for="p in groupList" :key="p.id">
+                                        <button @click="selectProject(p); open = false; mobileSidebarOpen = false"
+                                                class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-dark-800 transition-colors"
+                                                :class="currentProject && currentProject.id === p.id ? 'bg-dark-800 text-brand-300 font-semibold border border-brand-500/20' : 'text-zinc-300'">
+                                            <span class="truncate" x-text="p.name"></span>
+                                            <span class="text-[10px] text-zinc-500 font-mono ml-2 shrink-0" x-text="p.slug"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="border-t border-dark-800 my-1.5"></div>
+                        <button @click="showNewProjectModal = true; open = false"
+                                class="w-full text-left px-2.5 py-2 rounded-lg text-xs text-brand-400 hover:bg-dark-800 flex items-center gap-2 transition-colors font-medium">
+                            <span class="text-sm">＋</span>
+                            <span>Create New Project</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <div class="p-3 space-y-1">
+                <div class="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Vault Workspace</div>
+
+                <!-- 1. Secrets & Variables (Active) -->
+                <button class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-brand-500/10 text-brand-300 border border-brand-500/20 shadow-sm transition-colors">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-sm">🔐</span>
+                        <span>Secrets & Variables</span>
+                    </div>
+                    <span class="bg-brand-500/20 text-brand-300 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold" x-text="secrets.length"></span>
+                </button>
+
+                <!-- 2. Service Tokens -->
+                <button @click="openTokensModal()"
+                        class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-dark-850 transition-colors">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-sm">🔑</span>
+                        <span>Service Tokens</span>
+                    </div>
+                    <span class="bg-dark-800 text-zinc-400 text-[10px] font-mono px-1.5 py-0.5 rounded" x-text="tokens.length"></span>
+                </button>
+
+                <!-- 3. Integration Snippets (cURL, CI/CD, MCP) -->
+                <button @click="openSnippetsModal()"
+                        class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-dark-850 transition-colors">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-sm">⚡</span>
+                        <span>CI/CD & AI MCP</span>
+                    </div>
+                    <span class="text-[10px] text-zinc-500 font-mono">Export</span>
+                </button>
+
+                <!-- Admin Management Section -->
+                <div class="pt-3 pb-1">
+                    <div class="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Access & Governance</div>
+                </div>
+
+                <!-- 4. Team & RBAC -->
+                <button x-show="currentUser.is_admin" @click="openUsersModal()"
+                        class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-dark-850 transition-colors">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-sm">👥</span>
+                        <span>Team & RBAC</span>
+                    </div>
+                    <span class="bg-purple-950/60 border border-purple-800/60 text-purple-300 text-[9px] uppercase px-1.5 py-0.5 rounded font-bold">Admin</span>
+                </button>
+
+                <!-- 5. Ecosystems & Groups -->
+                <button x-show="currentUser.is_admin" @click="openGroupsModal()"
+                        class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-dark-850 transition-colors">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-sm">📁</span>
+                        <span>Ecosystem Groups</span>
+                    </div>
+                    <span class="bg-dark-800 text-zinc-400 text-[10px] font-mono px-1.5 py-0.5 rounded" x-text="groupsList.length"></span>
+                </button>
+            </div>
+
+            <!-- Environment Selector Sidebar Section -->
+            <div class="p-3 border-t border-dark-800">
+                <div class="flex items-center justify-between px-1 mb-2">
+                    <span class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Environments</span>
+                    <span class="text-[10px] font-mono text-zinc-500" x-text="environments.length + ' targets'"></span>
+                </div>
+                <div class="space-y-1">
+                    <template x-for="env in environments" :key="env.id">
+                        <button @click="selectEnvironment(env)"
+                                class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                                :class="currentEnv && currentEnv.id === env.id 
+                                    ? 'bg-dark-800 text-white shadow-sm border border-dark-700 font-semibold' 
+                                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-dark-850'">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-2 h-2 rounded-full"
+                                      :class="{
+                                          'bg-emerald-400 shadow-sm shadow-emerald-400/50': env.slug === 'dev',
+                                          'bg-amber-400 shadow-sm shadow-amber-400/50': env.slug === 'staging',
+                                          'bg-rose-400 shadow-sm shadow-rose-400/50': env.slug === 'prod',
+                                          'bg-brand-400 shadow-sm shadow-brand-400/50': !['dev', 'staging', 'prod'].includes(env.slug)
+                                      }"></span>
+                                <span x-text="env.name"></span>
+                            </div>
+                            <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded"
+                                  :class="{
+                                      'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40': env.slug === 'dev',
+                                      'bg-amber-950/60 text-amber-400 border border-amber-800/40': env.slug === 'staging',
+                                      'bg-rose-950/60 text-rose-400 border border-rose-800/40': env.slug === 'prod',
+                                      'bg-brand-950/60 text-brand-400 border border-brand-800/40': !['dev', 'staging', 'prod'].includes(env.slug)
+                                  }"
+                                  x-text="env.slug"></span>
+                        </button>
                     </template>
-                    <div class="border-t border-dark-800 my-1"></div>
-                    <button @click="showNewProjectModal = true; open = false"
-                            class="w-full text-left px-2.5 py-2 rounded-lg text-xs text-brand-400 hover:bg-dark-800 flex items-center gap-2 transition-colors font-medium">
-                        <span>＋</span>
-                        <span>Create New App / Project</span>
-                    </button>
                 </div>
             </div>
+        </div>
 
-            <!-- Environment Selector Tabs -->
-            <div class="flex items-center bg-dark-850 p-1 rounded-lg border border-dark-800">
-                <template x-for="env in environments" :key="env.id">
-                    <button @click="selectEnvironment(env)"
-                            class="px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5"
-                            :class="currentEnv && currentEnv.id === env.id 
-                                ? 'bg-dark-800 text-white shadow-sm border border-zinc-700/50' 
-                                : 'text-zinc-400 hover:text-zinc-200'">
-                        <span class="w-1.5 h-1.5 rounded-full"
-                              :class="{
-                                  'bg-emerald-400': env.slug === 'dev',
-                                  'bg-amber-400': env.slug === 'staging',
-                                  'bg-rose-400': env.slug === 'prod',
-                                  'bg-brand-400': !['dev', 'staging', 'prod'].includes(env.slug)
-                              }"></span>
-                        <span x-text="env.name"></span>
-                    </button>
-                </template>
+        <!-- Sidebar Bottom User & Security Profile -->
+        <div class="p-3 border-t border-dark-800 bg-dark-900/60 flex flex-col gap-2">
+            <!-- Hardware Encrypted Badge -->
+            <div class="flex items-center justify-between px-2 py-1 rounded-lg bg-dark-850/60 border border-dark-800/80 text-[10px] text-zinc-400 font-mono">
+                <span class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>AES-256-GCM</span>
+                </span>
+                <span class="text-zinc-500">Hardware at Rest</span>
+            </div>
+
+            <!-- User Info & Logout Button -->
+            <div class="flex items-center justify-between p-2 rounded-xl bg-dark-850 border border-dark-800">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                    <div class="w-8 h-8 rounded-lg bg-brand-500/20 border border-brand-500/30 text-brand-300 font-bold flex items-center justify-center text-xs shrink-0"
+                         x-text="(currentUser.username || 'A').substring(0, 2).toUpperCase()">
+                    </div>
+                    <div class="overflow-hidden">
+                        <div class="text-xs font-semibold text-white truncate" x-text="currentUser.username || 'Admin'"></div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded"
+                                  :class="currentUser.is_admin ? 'bg-brand-500/20 text-brand-300' : 'bg-zinc-800 text-zinc-400'"
+                                  x-text="currentUser.is_admin ? 'Admin' : (currentUserRoleInProject || 'Member')"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="logout()"
+                        class="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors text-xs"
+                        title="Sign Out">
+                    ⎋
+                </button>
             </div>
         </div>
 
-        <!-- Right User Actions -->
-        <div class="flex items-center gap-2.5">
-            <!-- User Role Badge -->
-            <div class="flex items-center gap-2 bg-dark-850 px-2.5 py-1.5 rounded-lg border border-dark-800 text-xs">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span class="font-medium text-zinc-200" x-text="currentUser.username || 'Admin'"></span>
-                <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded"
-                      :class="currentUser.is_admin ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'bg-zinc-800 text-zinc-400'"
-                      x-text="currentUser.is_admin ? 'Admin' : (currentUserRoleInProject || 'Member')"></span>
-            </div>
+    </aside>
 
-            <!-- Manage Users & RBAC (Admin Only) -->
-            <button x-show="currentUser.is_admin" @click="openUsersModal()"
-                    class="bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-xs font-medium text-brand-300 hover:text-white transition-colors flex items-center gap-1.5">
-                <span>👥</span>
-                <span>Team & RBAC</span>
-            </button>
-
-            <!-- Service Tokens -->
-            <button x-show="currentUserRoleInProject !== 'viewer'" @click="openTokensModal()"
-                    class="bg-dark-850 hover:bg-dark-800 border border-dark-800 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition-colors flex items-center gap-2">
-                <span>🔑 Service Tokens</span>
-                <span class="bg-dark-800 text-zinc-400 px-1.5 py-0.5 rounded text-[10px]" x-text="tokens.length"></span>
-            </button>
-
-            <button @click="logout()"
-                    class="text-zinc-400 hover:text-zinc-200 text-xs px-2.5 py-1.5 rounded-lg hover:bg-dark-850 transition-colors">
-                Sign Out
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-5">
+    <!-- Main Canvas Area (Pushed right on desktop by w-72) -->
+    <div class="flex-1 flex flex-col min-w-0 lg:pl-72">
         
-        <!-- Read-Only Viewer Warning Banner -->
-        <div x-show="currentUserRoleInProject === 'viewer'"
-             class="bg-blue-950/40 border border-blue-800/60 rounded-xl px-4 py-2.5 text-xs text-blue-300 flex items-center gap-2 shadow-sm">
-            <span>👁️</span>
-            <span><strong>Read-Only Mode:</strong> You have <strong>Viewer</strong> access to this project. You can inspect and copy decrypted secret values, but modifications and token generation are restricted.</span>
-        </div>
+        <!-- Top Application Header Bar -->
+        <header class="h-16 bg-dark-900/80 backdrop-blur-md border-b border-dark-800 px-6 flex items-center justify-between sticky top-0 z-30">
+            <!-- Left: Mobile Toggle & Breadcrumbs -->
+            <div class="flex items-center gap-4">
+                <button @click="mobileSidebarOpen = true" class="lg:hidden text-zinc-400 hover:text-white p-1">
+                    ☰
+                </button>
 
-        <!-- Controls & Mode Switcher Bar -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-dark-900 border border-dark-800 p-3.5 rounded-xl">
-            <div class="flex items-center gap-3">
-                <!-- View Mode Toggle -->
-                <div class="flex items-center bg-dark-850 p-1 rounded-lg border border-dark-800 text-xs">
-                    <button @click="viewMode = 'table'"
-                            class="px-3 py-1.5 rounded-md font-medium transition-all"
-                            :class="viewMode === 'table' ? 'bg-dark-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'">
-                        Table Editor
-                    </button>
-                    <button @click="viewMode = 'raw'; syncTableToRaw()"
-                            class="px-3 py-1.5 rounded-md font-medium transition-all"
-                            :class="viewMode === 'raw' ? 'bg-dark-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'">
-                        Raw .env Bulk Mode
-                    </button>
-                </div>
-
-                <!-- Live Search / Filter (in table mode) -->
-                <div x-show="viewMode === 'table'" class="relative">
-                    <input type="text" x-model="searchFilter" placeholder="Filter variables..."
-                           class="bg-dark-850 border border-dark-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-500 w-56">
-                    <span class="absolute left-2.5 top-2 text-xs text-zinc-500">🔍</span>
+                <!-- Interactive Breadcrumb -->
+                <div class="flex items-center gap-2 text-xs font-medium text-zinc-400">
+                    <span class="text-zinc-500">📁</span>
+                    <span class="hover:text-zinc-200 transition-colors font-semibold"
+                          x-text="currentProject && currentProject.group_name ? currentProject.group_name : 'Default Ecosystem'"></span>
+                    <span class="text-zinc-600">/</span>
+                    <span class="text-zinc-100 font-bold" x-text="currentProject ? currentProject.name : 'ExaVault App'"></span>
+                    <span class="text-zinc-600">/</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase"
+                          :class="{
+                              'bg-emerald-950 text-emerald-400 border border-emerald-800/60': currentEnv && currentEnv.slug === 'dev',
+                              'bg-amber-950 text-amber-400 border border-amber-800/60': currentEnv && currentEnv.slug === 'staging',
+                              'bg-rose-950 text-rose-400 border border-rose-800/60': currentEnv && currentEnv.slug === 'prod',
+                              'bg-brand-950 text-brand-400 border border-brand-800/60': !currentEnv || !['dev', 'staging', 'prod'].includes(currentEnv.slug)
+                          }"
+                          x-text="currentEnv ? currentEnv.name : 'Dev'"></span>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="flex items-center gap-2.5">
-                <button x-show="viewMode === 'table' && currentUserRoleInProject !== 'viewer'" @click="addSecretRow()"
-                        class="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
-                    <span>＋</span>
-                    <span>Add Variable</span>
-                </button>
-
+            <!-- Right Header Controls: Quick Actions -->
+            <div class="flex items-center gap-3">
+                
+                <!-- Export / Download .env Button -->
                 <button @click="downloadEnvFile()"
-                        class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-zinc-300 hover:text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                        class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-zinc-300 hover:text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
                     <span>📥</span>
-                    <span>Download .env</span>
+                    <span class="hidden sm:inline">Export .env</span>
                 </button>
 
-                <button x-show="currentUserRoleInProject !== 'viewer'" @click="saveSecrets()" :disabled="!isDirty || isSaving"
-                        class="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-brand-500/20">
+                <!-- Integration Snippets Button -->
+                <button @click="openSnippetsModal()"
+                        class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-brand-300 hover:text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                    <span>⚡</span>
+                    <span class="hidden sm:inline">CI/CD Export</span>
+                </button>
+
+                <!-- Save Changes Button with Dirty State -->
+                <button x-show="currentUserRoleInProject !== 'viewer'" 
+                        @click="saveSecrets()" 
+                        :disabled="!isDirty || isSaving"
+                        class="relative text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-lg"
+                        :class="isDirty 
+                            ? 'bg-brand-500 hover:bg-brand-600 shadow-brand-500/25 ring-2 ring-brand-400/30' 
+                            : 'bg-dark-800 text-zinc-400 opacity-60 cursor-not-allowed'">
+                    <span x-show="isDirty" class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                     <span x-show="!isSaving">Save Changes</span>
                     <span x-show="isSaving">Saving...</span>
+                    <span class="hidden md:inline text-[10px] opacity-70 font-mono">(⌘S)</span>
                 </button>
             </div>
-        </div>
+        </header>
 
-        <!-- Unsaved Changes Warning Banner -->
-        <template x-if="isDirty">
-            <div class="bg-amber-950/40 border border-amber-800/60 rounded-xl px-4 py-2.5 flex items-center justify-between text-amber-300 text-xs">
-                <div class="flex items-center gap-2">
-                    <span>⚠️</span>
-                    <span>You have unsaved changes. Remember to click <strong>Save Changes</strong> before leaving.</span>
+        <!-- Main Dashboard Content Canvas -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
+
+            <!-- Read-Only Viewer Warning Banner -->
+            <div x-show="currentUserRoleInProject === 'viewer'"
+                 class="bg-blue-950/40 border border-blue-800/60 rounded-xl px-4 py-3 text-xs text-blue-300 flex items-center gap-3 shadow-sm">
+                <span class="text-base">👁️</span>
+                <span><strong>Read-Only Access:</strong> You are currently logged in as a <strong>Viewer</strong>. You can inspect and copy decrypted secret values for local development, but modifications and token generation are restricted.</span>
+            </div>
+
+            <!-- Unsaved Changes Floating Alert Banner -->
+            <div x-show="isDirty"
+                 class="bg-amber-950/50 border border-amber-800/80 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-300 text-xs shadow-xl animate-fade-in">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-base">⚠️</span>
+                    <span>You have unsaved changes in <strong x-text="currentEnv ? currentEnv.name : 'this environment'"></strong>. Remember to click <strong>Save Changes</strong> (or press <kbd class="px-1.5 py-0.5 rounded bg-amber-900/60 font-mono text-[10px]">Ctrl+S</kbd>) to encrypt and persist them.</span>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button @click="discardChanges()" class="underline hover:text-amber-100">Discard</button>
-                    <button @click="saveSecrets()" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-1 rounded text-xs">Save</button>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button @click="discardChanges()" class="px-3 py-1 rounded-lg bg-dark-900/80 border border-amber-800/60 text-amber-200 hover:text-white transition-colors">Discard</button>
+                    <button @click="saveSecrets()" class="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-md transition-colors">Save Now</button>
                 </div>
             </div>
-        </template>
 
-        <!-- View 1: Key-Value Table View -->
-        <div x-show="viewMode === 'table'" class="bg-dark-900 border border-dark-800 rounded-xl overflow-hidden shadow-xl">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-dark-850/70 border-b border-dark-800 text-zinc-400 text-xs uppercase font-medium">
-                        <tr>
-                            <th class="px-4 py-3 w-1/4">Key</th>
-                            <th class="px-4 py-3 w-2/5">Value</th>
-                            <th class="px-4 py-3 w-1/4">Comment</th>
-                            <th class="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-dark-800 font-mono text-xs">
-                        <template x-for="(s, index) in filteredSecrets" :key="index">
-                            <tr class="hover:bg-dark-850/40 transition-colors">
-                                <!-- Key Input -->
-                                <td class="px-4 py-2.5">
-                                    <input type="text" x-model="s.key" @input="isDirty = true" placeholder="KEY_NAME"
-                                           class="w-full bg-transparent border-b border-transparent hover:border-dark-800 focus:border-brand-500 focus:outline-none text-zinc-100 font-semibold px-1 py-1">
-                                </td>
+            <!-- Dashboard Summary Stat Cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Stat 1: Total Variables -->
+                <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col gap-1 shadow-sm hover:border-dark-700 transition-colors">
+                    <div class="flex items-center justify-between text-zinc-400 text-xs">
+                        <span>Total Secrets</span>
+                        <span class="text-brand-400 text-sm">🔐</span>
+                    </div>
+                    <div class="text-2xl font-black text-white tracking-tight" x-text="secrets.length"></div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5" x-text="`${currentEnv ? currentEnv.name : 'Active'} environment`"></div>
+                </div>
 
-                                <!-- Value Input with Mask/Unmask -->
-                                <td class="px-4 py-2.5">
-                                    <div class="flex items-center gap-2 bg-dark-850 border border-dark-800 rounded-lg px-2.5 py-1">
-                                        <input :type="s.masked ? 'password' : 'text'" x-model="s.value" @input="isDirty = true" placeholder="Secret value..."
-                                               class="w-full bg-transparent focus:outline-none text-zinc-200 font-mono text-xs">
-                                        <button type="button" @click="s.masked = !s.masked"
-                                                class="text-zinc-500 hover:text-zinc-300 text-xs px-1" title="Toggle Visibility">
-                                            <span x-text="s.masked ? '👁️' : '🙈'"></span>
-                                        </button>
-                                        <button type="button" @click="copyToClipboard(s.value, 'Value copied!')"
-                                                class="text-zinc-500 hover:text-zinc-300 text-xs px-1" title="Copy Value">
-                                            📋
-                                        </button>
-                                    </div>
-                                </td>
+                <!-- Stat 2: Active Service Tokens -->
+                <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col gap-1 shadow-sm hover:border-dark-700 transition-colors">
+                    <div class="flex items-center justify-between text-zinc-400 text-xs">
+                        <span>Machine Tokens</span>
+                        <span class="text-purple-400 text-sm">🔑</span>
+                    </div>
+                    <div class="text-2xl font-black text-white tracking-tight" x-text="tokens.length"></div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5">Scoped CI/CD exports</div>
+                </div>
 
-                                <!-- Comment Input -->
-                                <td class="px-4 py-2.5 font-sans">
-                                    <input type="text" x-model="s.comment" @input="isDirty = true" placeholder="Optional comment..."
-                                           class="w-full bg-transparent border-b border-transparent hover:border-dark-800 focus:border-brand-500 focus:outline-none text-zinc-400 text-xs px-1 py-1">
-                                </td>
+                <!-- Stat 3: Encryption Engine -->
+                <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col gap-1 shadow-sm hover:border-dark-700 transition-colors">
+                    <div class="flex items-center justify-between text-zinc-400 text-xs">
+                        <span>Encryption</span>
+                        <span class="text-emerald-400 text-sm">🛡️</span>
+                    </div>
+                    <div class="text-lg font-black text-emerald-400 tracking-tight">AES-256-GCM</div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5">Hardware accelerated</div>
+                </div>
 
-                                <!-- Actions -->
-                                <td class="px-4 py-2.5 text-right font-sans">
-                                    <button @click="deleteSecretRow(index)"
-                                            class="text-zinc-500 hover:text-rose-400 text-xs p-1 rounded hover:bg-rose-950/30 transition-colors" title="Delete Variable">
-                                        🗑️
-                                    </button>
-                                </td>
-                            </tr>
-                        </template>
+                <!-- Stat 4: Role & Governance -->
+                <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col gap-1 shadow-sm hover:border-dark-700 transition-colors">
+                    <div class="flex items-center justify-between text-zinc-400 text-xs">
+                        <span>Your Role</span>
+                        <span class="text-blue-400 text-sm">👤</span>
+                    </div>
+                    <div class="text-lg font-black text-white tracking-tight capitalize" x-text="currentUser.is_admin ? 'Global Admin' : (currentUserRoleInProject || 'Editor')"></div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5" x-text="currentUserRoleInProject === 'viewer' ? 'Read-only access' : 'Full read & write'"></div>
+                </div>
+            </div>
 
-                        <template x-if="filteredSecrets.length === 0">
+            <!-- Toolbar & Controls Bar -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-dark-900 border border-dark-800 p-4 rounded-2xl shadow-sm">
+                
+                <!-- Left: View Mode Toggle & Live Search -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- View Mode Toggle -->
+                    <div class="flex items-center bg-dark-850 p-1 rounded-xl border border-dark-800 text-xs">
+                        <button @click="viewMode = 'table'"
+                                class="px-3.5 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5"
+                                :class="viewMode === 'table' ? 'bg-dark-800 text-white shadow-sm font-semibold' : 'text-zinc-400 hover:text-zinc-200'">
+                            <span>📋</span>
+                            <span>Table Editor</span>
+                        </button>
+                        <button @click="viewMode = 'raw'; syncTableToRaw()"
+                                class="px-3.5 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5"
+                                :class="viewMode === 'raw' ? 'bg-dark-800 text-white shadow-sm font-semibold' : 'text-zinc-400 hover:text-zinc-200'">
+                            <span>📄</span>
+                            <span>Raw .env Bulk Mode</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Search (Table Mode) -->
+                    <div x-show="viewMode === 'table'" class="relative">
+                        <input type="text" x-model="searchFilter" placeholder="Filter variables (e.g. DB_, API_)..."
+                               class="bg-dark-850 border border-dark-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-500 w-64 transition-colors">
+                        <span class="absolute left-2.5 top-2 text-xs text-zinc-500">🔍</span>
+                    </div>
+                </div>
+
+                <!-- Right Toolbar Actions -->
+                <div class="flex items-center gap-2.5">
+                    
+                    <!-- Toggle All Mask Button -->
+                    <button x-show="viewMode === 'table' && secrets.length > 0"
+                            @click="toggleAllMask()"
+                            class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-zinc-300 hover:text-white text-xs font-medium px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5">
+                        <span x-text="allMasked ? '👁️' : '🙈'"></span>
+                        <span x-text="allMasked ? 'Reveal All' : 'Hide All'"></span>
+                    </button>
+
+                    <!-- Add Variable Row -->
+                    <button x-show="viewMode === 'table' && currentUserRoleInProject !== 'viewer'" 
+                            @click="addSecretRow()"
+                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 shadow-md shadow-brand-500/10">
+                        <span>＋</span>
+                        <span>Add Variable</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- View 1: Table Editor Card -->
+            <div x-show="viewMode === 'table'" class="bg-dark-900 border border-dark-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-dark-850/80 border-b border-dark-800 text-zinc-400 text-[11px] uppercase tracking-wider font-semibold">
                             <tr>
-                                <td colspan="4" class="px-4 py-12 text-center text-zinc-500 font-sans">
-                                    <p class="text-sm">No variables found in this environment.</p>
-                                    <button @click="addSecretRow()" class="mt-2 text-xs text-brand-400 hover:underline">
-                                        + Add the first variable
-                                    </button>
-                                </td>
+                                <th class="px-5 py-3 w-1/4">Key Name</th>
+                                <th class="px-5 py-3 w-2/5">Encrypted Value</th>
+                                <th class="px-5 py-3 w-1/4">Description / Comment</th>
+                                <th class="px-5 py-3 text-right">Actions</th>
                             </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody class="divide-y divide-dark-800 font-mono text-xs">
+                            <template x-for="(s, index) in filteredSecrets" :key="index">
+                                <tr class="hover:bg-dark-850/40 transition-colors group">
+                                    <!-- Key Input -->
+                                    <td class="px-5 py-3">
+                                        <input type="text" x-model="s.key" @input="isDirty = true" placeholder="KEY_NAME"
+                                               class="w-full bg-transparent border-b border-transparent hover:border-dark-700 focus:border-brand-500 focus:outline-none text-zinc-100 font-bold px-1 py-1 transition-colors">
+                                    </td>
 
-            <!-- Table Bottom Footer -->
-            <div class="bg-dark-850/40 border-t border-dark-800 p-3 flex items-center justify-between text-xs text-zinc-500">
-                <span x-text="`${secrets.length} secret variables loaded`"></span>
-                <button @click="addSecretRow()" class="text-brand-400 hover:text-brand-300 font-medium">
-                    ＋ Add Row
-                </button>
-            </div>
-        </div>
+                                    <!-- Value Input with Mask/Unmask & Copy -->
+                                    <td class="px-5 py-3">
+                                        <div class="flex items-center gap-2 bg-dark-950/80 border border-dark-800 group-hover:border-dark-700 rounded-xl px-3 py-1.5 transition-colors focus-within:border-brand-500">
+                                            <input :type="s.masked ? 'password' : 'text'" x-model="s.value" @input="isDirty = true" placeholder="Secret value..."
+                                                   class="w-full bg-transparent focus:outline-none text-zinc-200 font-mono text-xs selection:bg-brand-500 selection:text-white">
+                                            <button type="button" @click="s.masked = !s.masked"
+                                                    class="text-zinc-500 hover:text-zinc-300 text-xs px-1 transition-colors" 
+                                                    :title="s.masked ? 'Reveal value' : 'Mask value'">
+                                                <span x-text="s.masked ? '👁️' : '🙈'"></span>
+                                            </button>
+                                            <button type="button" @click="copyToClipboard(s.value, 'Value copied to clipboard!')"
+                                                    class="text-zinc-500 hover:text-brand-300 text-xs px-1 transition-colors" title="Copy Value">
+                                                📋
+                                            </button>
+                                        </div>
+                                    </td>
 
-        <!-- View 2: Raw .env Bulk Mode -->
-        <div x-show="viewMode === 'raw'" class="bg-dark-900 border border-dark-800 rounded-xl p-4 flex flex-col gap-3 shadow-xl">
-            <div class="flex items-center justify-between text-xs text-zinc-400 pb-2 border-b border-dark-800">
-                <span>Paste or edit raw .env text. Comments (#) and multiline strings are supported.</span>
-                <div class="flex items-center gap-2">
-                    <button @click="copyToClipboard(rawEnvText, 'Entire .env copied!')"
-                            class="hover:text-white px-2 py-1 bg-dark-850 border border-dark-800 rounded">
-                        📋 Copy Raw Text
-                    </button>
-                    <button @click="syncRawToTable()"
-                            class="hover:text-white px-2 py-1 bg-dark-800 border border-zinc-700 text-brand-400 rounded">
-                        🔄 Parse to Table
+                                    <!-- Comment Input -->
+                                    <td class="px-5 py-3 font-sans">
+                                        <input type="text" x-model="s.comment" @input="isDirty = true" placeholder="Optional description..."
+                                               class="w-full bg-transparent border-b border-transparent hover:border-dark-700 focus:border-brand-500 focus:outline-none text-zinc-400 text-xs px-1 py-1 transition-colors">
+                                    </td>
+
+                                    <!-- Row Actions -->
+                                    <td class="px-5 py-3 text-right font-sans">
+                                        <button @click="deleteSecretRow(index)"
+                                                class="text-zinc-500 hover:text-rose-400 text-xs p-1.5 rounded-lg hover:bg-rose-950/30 transition-colors" title="Delete Variable">
+                                            🗑️
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <!-- Empty State -->
+                            <template x-if="filteredSecrets.length === 0">
+                                <tr>
+                                    <td colspan="4" class="px-6 py-16 text-center text-zinc-500 font-sans">
+                                        <div class="w-12 h-12 rounded-2xl bg-dark-850 border border-dark-800 flex items-center justify-center text-xl mx-auto mb-3">
+                                            🔍
+                                        </div>
+                                        <p class="text-sm font-medium text-zinc-300">No secret variables found</p>
+                                        <p class="text-xs text-zinc-500 mt-1">Start storing encrypted variables in this environment.</p>
+                                        <button x-show="currentUserRoleInProject !== 'viewer'" 
+                                                @click="addSecretRow()" 
+                                                class="mt-4 px-4 py-2 bg-brand-500/10 hover:bg-brand-500/20 text-brand-300 border border-brand-500/30 rounded-xl text-xs font-semibold transition-colors">
+                                            ＋ Add First Variable
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Bottom Footer Summary -->
+                <div class="bg-dark-850/50 border-t border-dark-800 px-5 py-3 flex items-center justify-between text-xs text-zinc-500">
+                    <span x-text="`${secrets.length} secret variables loaded in ${currentEnv ? currentEnv.name : 'current'} environment`"></span>
+                    <button x-show="currentUserRoleInProject !== 'viewer'" 
+                            @click="addSecretRow()" 
+                            class="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+                        ＋ Add New Row
                     </button>
                 </div>
             </div>
 
-            <textarea x-model="rawEnvText" @input="isDirty = true" rows="18"
-                      class="w-full bg-dark-950 border border-dark-800 rounded-lg p-4 font-mono text-xs text-zinc-200 focus:outline-none focus:border-brand-500 leading-relaxed resize-y"
-                      placeholder="KEY_NAME=value&#10;# comment&#10;DATABASE_URL=&quot;postgres://...&quot;"></textarea>
-        </div>
+            <!-- View 2: Raw .env Bulk Mode Card -->
+            <div x-show="viewMode === 'raw'" class="bg-dark-900 border border-dark-800 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-dark-800 text-xs text-zinc-400">
+                    <div class="flex items-center gap-2">
+                        <span>📄</span>
+                        <span>Direct <code>.env</code> file editor. Comments (<code>#</code>) and multiline strings are automatically parsed.</span>
+                    </div>
+                    <div class="flex items-center gap-2 self-end sm:self-auto">
+                        <button @click="copyToClipboard(rawEnvText, 'Entire .env copied!')"
+                                class="hover:text-white px-3 py-1.5 bg-dark-850 hover:bg-dark-800 border border-dark-800 rounded-xl transition-colors">
+                            📋 Copy Text
+                        </button>
+                        <button @click="syncRawToTable(); toast('Parsed into Table Editor view!', 'success')"
+                                class="hover:text-white px-3 py-1.5 bg-dark-800 hover:bg-dark-750 border border-zinc-700 text-brand-300 rounded-xl transition-colors font-medium">
+                            🔄 Parse to Table
+                        </button>
+                    </div>
+                </div>
 
-    </main>
+                <textarea x-model="rawEnvText" @input="isDirty = true" rows="18"
+                          class="w-full bg-dark-950 border border-dark-800 rounded-xl p-4 font-mono text-xs text-zinc-200 focus:outline-none focus:border-brand-500 leading-relaxed resize-y selection:bg-brand-500 selection:text-white"
+                          placeholder="KEY_NAME=value&#10;# comment&#10;DATABASE_URL=&quot;postgres://...&quot;"></textarea>
+            </div>
 
-    <!-- Modal 1: Service Tokens & Snippets -->
-    <div x-show="showTokensModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        </main>
+    </div>
+
+    <!-- Modal 1: Service Tokens Management -->
+    <div x-show="showTokensModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+         x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
         <div @click.away="showTokensModal = false"
              class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             
             <div class="px-6 py-4 border-b border-dark-800 flex items-center justify-between">
-                <div>
-                    <h3 class="font-bold text-white text-base">Service Tokens</h3>
-                    <p class="text-xs text-zinc-400">Scoped machine access for CI/CD, containers, and CLI export</p>
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-sm font-bold">
+                        🔑
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">Service Tokens</h3>
+                        <p class="text-xs text-zinc-400">Scoped machine credentials for CI/CD, Docker containers, and AI IDE plugins</p>
+                    </div>
                 </div>
-                <button @click="showTokensModal = false" class="text-zinc-400 hover:text-zinc-200 text-lg">✕</button>
+                <button @click="showTokensModal = false" class="text-zinc-400 hover:text-white text-lg p-1">✕</button>
             </div>
 
             <div class="p-6 overflow-y-auto flex flex-col gap-6">
                 <!-- Create Token Form -->
-                <div class="bg-dark-850 border border-dark-800 rounded-xl p-4 flex flex-col gap-3">
+                <div class="bg-dark-850 border border-dark-800 rounded-2xl p-4 flex flex-col gap-3">
                     <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Generate New Token</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div class="sm:col-span-2">
                             <label class="block text-[11px] text-zinc-400 mb-1">Token Name</label>
                             <input type="text" x-model="newTokenName" placeholder="e.g. GitHub Actions, Prod Server"
-                                   class="w-full bg-dark-900 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                                   class="w-full bg-dark-900 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                         </div>
                         <div>
                             <label class="block text-[11px] text-zinc-400 mb-1">Expiration</label>
                             <select x-model="newTokenDays"
-                                    class="w-full bg-dark-900 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                                    class="w-full bg-dark-900 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                                 <option value="7">7 Days</option>
                                 <option value="30">30 Days</option>
                                 <option value="90">90 Days</option>
@@ -350,7 +591,7 @@
                     </div>
                     <div class="flex justify-end mt-1">
                         <button @click="generateServiceToken()" :disabled="!newTokenName.trim()"
-                                class="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+                                class="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-md">
                             Generate Token
                         </button>
                     </div>
@@ -358,12 +599,12 @@
 
                 <!-- Existing Tokens List -->
                 <div class="flex flex-col gap-2">
-                    <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Active Tokens</h4>
-                    <div class="divide-y divide-dark-800 border border-dark-800 rounded-xl overflow-hidden bg-dark-950">
+                    <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Active Machine Tokens</h4>
+                    <div class="divide-y divide-dark-800 border border-dark-800 rounded-2xl overflow-hidden bg-dark-950">
                         <template x-for="t in tokens" :key="t.id">
                             <div class="p-3.5 flex items-center justify-between text-xs">
                                 <div>
-                                    <div class="font-medium text-zinc-200" x-text="t.name"></div>
+                                    <div class="font-semibold text-zinc-200" x-text="t.name"></div>
                                     <div class="font-mono text-zinc-500 text-[11px] mt-0.5" x-text="t.token_prefix"></div>
                                 </div>
                                 <div class="flex items-center gap-4">
@@ -371,15 +612,15 @@
                                         <div x-text="t.last_used_at ? 'Used: ' + formatDate(t.last_used_at) : 'Never used'"></div>
                                         <div x-text="t.expires_at ? 'Expires: ' + formatDate(t.expires_at) : 'No expiration'"></div>
                                     </div>
-                                    <button @click="revokeToken(t.id)" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded hover:bg-rose-950/30">
+                                    <button @click="revokeToken(t.id)" class="text-rose-400 hover:text-rose-300 text-xs px-2.5 py-1 rounded-lg hover:bg-rose-950/30 transition-colors">
                                         Revoke
                                     </button>
                                 </div>
                             </div>
                         </template>
                         <template x-if="tokens.length === 0">
-                            <div class="p-6 text-center text-xs text-zinc-500">
-                                No service tokens generated yet.
+                            <div class="p-8 text-center text-xs text-zinc-500">
+                                No service tokens generated yet. Create one above for CI/CD or CLI pulls.
                             </div>
                         </template>
                     </div>
@@ -388,30 +629,31 @@
         </div>
     </div>
 
-    <!-- Modal 2: New Token One-Time Reveal & Integration Snippets -->
-    <div x-show="showCreatedTokenModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <!-- Modal 2: New Token One-Time Reveal & Ready Snippets -->
+    <div x-show="showCreatedTokenModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+         x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
         <div class="bg-dark-900 border border-brand-500/40 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl p-6 gap-5">
             <div class="flex items-center justify-between pb-3 border-b border-dark-800">
                 <div class="flex items-center gap-2 text-emerald-400">
                     <span class="text-lg">✅</span>
                     <h3 class="font-bold text-white text-base">Service Token Created</h3>
                 </div>
-                <button @click="showCreatedTokenModal = false" class="text-zinc-400 hover:text-zinc-200">✕</button>
+                <button @click="showCreatedTokenModal = false" class="text-zinc-400 hover:text-white">✕</button>
             </div>
 
-            <div class="bg-rose-950/50 border border-rose-800/80 rounded-xl p-3 text-rose-300 text-xs flex items-start gap-2">
-                <span>⚠️</span>
-                <span>Copy this token now! For security, it is stored as an irreversible SHA-256 hash and <strong>will never be shown again</strong>.</span>
+            <div class="bg-rose-950/50 border border-rose-800/80 rounded-xl p-3 text-rose-300 text-xs flex items-start gap-2.5">
+                <span class="text-base">⚠️</span>
+                <span>Copy this token now! For maximum zero-trust security, it is stored as an irreversible SHA-256 hash in database and <strong>will never be shown again</strong>.</span>
             </div>
 
             <!-- Token Copy Box -->
             <div>
-                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Raw Service Token</label>
-                <div class="flex items-center gap-2 bg-dark-950 border border-dark-800 rounded-lg p-2.5">
+                <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Raw Service Token</label>
+                <div class="flex items-center gap-2 bg-dark-950 border border-dark-800 rounded-xl p-2.5">
                     <input type="text" readonly :value="newlyCreatedToken"
                            class="w-full bg-transparent font-mono text-xs text-brand-300 focus:outline-none select-all">
                     <button @click="copyToClipboard(newlyCreatedToken, 'Token copied to clipboard!')"
-                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs px-3 py-1.5 rounded font-medium">
+                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold transition-colors">
                         Copy
                     </button>
                 </div>
@@ -422,19 +664,19 @@
                 <div class="flex items-center justify-between">
                     <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Ready Integration Snippets</h4>
                     <!-- Tabs -->
-                    <div class="flex items-center gap-1 bg-dark-950 p-0.5 rounded-lg border border-dark-800 text-[11px]">
+                    <div class="flex items-center gap-1 bg-dark-950 p-1 rounded-xl border border-dark-800 text-[11px]">
                         <button type="button" @click="activeTab = 'curl'"
                                 :class="activeTab === 'curl' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
-                                class="px-2 py-0.5 rounded transition-colors">cURL</button>
+                                class="px-2.5 py-1 rounded-lg transition-colors">cURL</button>
                         <button type="button" @click="activeTab = 'github'"
                                 :class="activeTab === 'github' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
-                                class="px-2 py-0.5 rounded transition-colors">GitHub Actions</button>
+                                class="px-2.5 py-1 rounded-lg transition-colors">GitHub Actions</button>
                         <button type="button" @click="activeTab = 'gitlab'"
                                 :class="activeTab === 'gitlab' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
-                                class="px-2 py-0.5 rounded transition-colors">GitLab CI</button>
+                                class="px-2.5 py-1 rounded-lg transition-colors">GitLab CI</button>
                         <button type="button" @click="activeTab = 'mcp'"
                                 :class="activeTab === 'mcp' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
-                                class="px-2 py-0.5 rounded transition-colors">AI MCP</button>
+                                class="px-2.5 py-1 rounded-lg transition-colors">AI MCP</button>
                     </div>
                 </div>
                 
@@ -445,7 +687,7 @@
                             <span>Direct file pull (save as <code>.env</code>):</span>
                             <button @click="copyToClipboard(getCurlFileSnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
                         </div>
-                        <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlFileSnippet()"></pre>
+                        <pre class="bg-dark-950 p-2.5 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlFileSnippet()"></pre>
                     </div>
 
                     <div>
@@ -453,7 +695,7 @@
                             <span>In-memory process injection (no file written to disk):</span>
                             <button @click="copyToClipboard(getCurlMemorySnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
                         </div>
-                        <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlMemorySnippet()"></pre>
+                        <pre class="bg-dark-950 p-2.5 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getCurlMemorySnippet()"></pre>
                     </div>
                 </div>
 
@@ -463,7 +705,7 @@
                         <span>Save in Repo Settings &rarr; Secrets &rarr; <code>EXAVAULT_TOKEN</code></span>
                         <button @click="copyToClipboard(getGithubActionsSnippet(), 'GitHub Actions YAML copied!')" class="text-brand-400 hover:underline">Copy YAML</button>
                     </div>
-                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getGithubActionsSnippet()"></pre>
+                    <pre class="bg-dark-950 p-2.5 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getGithubActionsSnippet()"></pre>
                 </div>
 
                 <!-- Tab 3: GitLab CI/CD -->
@@ -472,7 +714,7 @@
                         <span>Save in Settings &rarr; CI/CD &rarr; Variables &rarr; <code>EXAVAULT_TOKEN</code> (Masked)</span>
                         <button @click="copyToClipboard(getGitlabCiSnippet(), 'GitLab CI snippet copied!')" class="text-brand-400 hover:underline">Copy YAML</button>
                     </div>
-                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getGitlabCiSnippet()"></pre>
+                    <pre class="bg-dark-950 p-2.5 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getGitlabCiSnippet()"></pre>
                 </div>
 
                 <!-- Tab 4: AI MCP Assistant -->
@@ -481,40 +723,121 @@
                         <span>Antigravity / Cursor / Claude Code (<code>mcpServers</code> config):</span>
                         <button @click="copyToClipboard(getMcpSnippet(), 'MCP config copied!')" class="text-brand-400 hover:underline">Copy JSON</button>
                     </div>
-                    <pre class="bg-dark-950 p-2.5 rounded-lg border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getMcpSnippet()"></pre>
+                    <pre class="bg-dark-950 p-2.5 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48" x-text="getMcpSnippet()"></pre>
                 </div>
             </div>
 
             <div class="flex justify-end pt-2 border-t border-dark-800">
                 <button @click="showCreatedTokenModal = false"
-                        class="bg-dark-800 hover:bg-dark-700 text-white text-xs px-4 py-2 rounded-lg font-medium">
+                        class="bg-dark-800 hover:bg-dark-750 text-white text-xs px-4 py-2 rounded-xl font-semibold transition-colors">
                     Done
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Modal 3: Create Project Modal -->
-    <div x-show="showNewProjectModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <!-- Modal 3: Integration Snippets Direct Modal (For Header / Sidebar shortcut) -->
+    <div x-show="showSnippetsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+         x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+        <div @click.away="showSnippetsModal = false"
+             class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl p-6 gap-5"
+             x-data="{ activeTab: 'curl' }">
+            <div class="flex items-center justify-between pb-3 border-b border-dark-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center text-sm font-bold">
+                        ⚡
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">CI/CD & CLI Integration Snippets</h3>
+                        <p class="text-xs text-zinc-400">Export secrets directly into Docker builds, GitHub Actions, GitLab, and IDEs</p>
+                    </div>
+                </div>
+                <button @click="showSnippetsModal = false" class="text-zinc-400 hover:text-white">✕</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex items-center gap-1 bg-dark-950 p-1 rounded-xl border border-dark-800 text-[11px]">
+                <button type="button" @click="activeTab = 'curl'"
+                        :class="activeTab === 'curl' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                        class="px-2.5 py-1 rounded-lg transition-colors">cURL / CLI</button>
+                <button type="button" @click="activeTab = 'github'"
+                        :class="activeTab === 'github' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                        class="px-2.5 py-1 rounded-lg transition-colors">GitHub Actions</button>
+                <button type="button" @click="activeTab = 'gitlab'"
+                        :class="activeTab === 'gitlab' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                        class="px-2.5 py-1 rounded-lg transition-colors">GitLab CI</button>
+                <button type="button" @click="activeTab = 'mcp'"
+                        :class="activeTab === 'mcp' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
+                        class="px-2.5 py-1 rounded-lg transition-colors">AI MCP Assistant</button>
+            </div>
+
+            <!-- Snippet Contents -->
+            <div class="space-y-3">
+                <div x-show="activeTab === 'curl'" class="space-y-3">
+                    <div>
+                        <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <span>cURL file export (replaces manual <code>.env</code> creation):</span>
+                            <button @click="copyToClipboard(getGenericCurlSnippet(), 'Snippet copied!')" class="text-brand-400 hover:underline">Copy</button>
+                        </div>
+                        <pre class="bg-dark-950 p-3 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto" x-text="getGenericCurlSnippet()"></pre>
+                    </div>
+                </div>
+
+                <div x-show="activeTab === 'github'">
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>Workflow step in <code>.github/workflows/deploy.yml</code>:</span>
+                        <button @click="copyToClipboard(getGithubActionsSnippet(), 'Workflow YAML copied!')" class="text-brand-400 hover:underline">Copy YAML</button>
+                    </div>
+                    <pre class="bg-dark-950 p-3 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-52" x-text="getGithubActionsSnippet()"></pre>
+                </div>
+
+                <div x-show="activeTab === 'gitlab'">
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>Job in <code>.gitlab-ci.yml</code>:</span>
+                        <button @click="copyToClipboard(getGitlabCiSnippet(), 'GitLab CI YAML copied!')" class="text-brand-400 hover:underline">Copy YAML</button>
+                    </div>
+                    <pre class="bg-dark-950 p-3 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-52" x-text="getGitlabCiSnippet()"></pre>
+                </div>
+
+                <div x-show="activeTab === 'mcp'">
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>MCP Server configuration for Antigravity / Cursor:</span>
+                        <button @click="copyToClipboard(getMcpSnippet(), 'MCP JSON copied!')" class="text-brand-400 hover:underline">Copy JSON</button>
+                    </div>
+                    <pre class="bg-dark-950 p-3 rounded-xl border border-dark-800 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-52" x-text="getMcpSnippet()"></pre>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-dark-800">
+                <button @click="showSnippetsModal = false"
+                        class="bg-dark-800 hover:bg-dark-750 text-white text-xs px-4 py-2 rounded-xl font-semibold transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 4: Create Project Modal -->
+    <div x-show="showNewProjectModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div @click.away="showNewProjectModal = false"
              class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
             <h3 class="font-bold text-white text-base">Create New App / Project</h3>
             
             <form @submit.prevent="createProject" class="space-y-3.5">
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">Ecosystem / Group</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Ecosystem / Group</label>
                     <div class="space-y-1.5" x-data="{ mode: 'select' }">
                         <template x-if="mode === 'select'">
                             <div class="flex items-center gap-1.5">
                                 <select x-model="newProjectForm.group_id"
-                                        class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                                        class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                                     <option value="">Standalone (No Ecosystem Group)</option>
                                     <template x-for="g in groupsList" :key="g.id">
                                         <option :value="g.id" x-text="`${g.name} (${g.projects_count} apps)`"></option>
                                     </template>
                                 </select>
                                 <button type="button" @click="mode = 'new'; newProjectForm.group_id = '';"
-                                        class="px-2.5 py-2 bg-dark-800 hover:bg-dark-750 border border-dark-800 rounded-lg text-xs text-brand-300 whitespace-nowrap">
+                                        class="px-2.5 py-2 bg-dark-800 hover:bg-dark-750 border border-dark-800 rounded-xl text-xs text-brand-300 whitespace-nowrap">
                                     ＋ New
                                 </button>
                             </div>
@@ -522,9 +845,9 @@
                         <template x-if="mode === 'new'">
                             <div class="flex items-center gap-1.5">
                                 <input type="text" x-model="newProjectForm.group_name" placeholder="New ecosystem name (e.g. Coffe)"
-                                       class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                                       class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                                 <button type="button" @click="mode = 'select'; newProjectForm.group_name = '';"
-                                        class="px-2.5 py-2 bg-dark-800 hover:bg-dark-750 border border-dark-800 rounded-lg text-xs text-zinc-400 whitespace-nowrap">
+                                        class="px-2.5 py-2 bg-dark-800 hover:bg-dark-750 border border-dark-800 rounded-xl text-xs text-zinc-400 whitespace-nowrap">
                                     Cancel
                                 </button>
                             </div>
@@ -534,21 +857,21 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">App / Service Name</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">App / Service Name</label>
                     <input type="text" x-model="newProjectForm.name" required placeholder="e.g. FE POS or Master Data"
-                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                           class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">Slug (optional)</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Slug (optional)</label>
                     <input type="text" x-model="newProjectForm.slug" placeholder="e.g. fe-pos"
-                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                           class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">Description (optional)</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Description (optional)</label>
                     <textarea x-model="newProjectForm.description" rows="2" placeholder="Brief service description"
-                              class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500"></textarea>
+                              class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500"></textarea>
                 </div>
 
                 <p class="text-[11px] text-zinc-500">
@@ -557,9 +880,9 @@
 
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" @click="showNewProjectModal = false"
-                            class="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white">Cancel</button>
+                            class="px-3 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white">Cancel</button>
                     <button type="submit"
-                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-1.5 rounded-lg">
+                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-md">
                         Create Project
                     </button>
                 </div>
@@ -567,197 +890,197 @@
         </div>
     </div>
 
-    <!-- Modal 4: Team & RBAC Management -->
+    <!-- Modal 5: Team & RBAC Management -->
     <div x-show="showUsersModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
          x-data="{ activeTab: 'users', newGroupName: '', newGroupDesc: '' }">
         <div @click.away="showUsersModal = false"
              class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl p-6 gap-5">
             <div class="flex items-center justify-between pb-3 border-b border-dark-800">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400 font-bold text-base">
+                    <div class="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400 font-bold text-base">
                         👥
                     </div>
                     <div>
-                        <h3 class="font-bold text-white text-base">Team Access, RBAC & Ecosystems</h3>
-                        <p class="text-xs text-zinc-400">Manage user credentials, microservice permissions, and first-class relational ecosystems.</p>
+                        <h3 class="font-bold text-white text-base">Team Access & RBAC Governance</h3>
+                        <p class="text-xs text-zinc-400">Manage credentials, per-service roles, and team authorization</p>
                     </div>
                 </div>
-                <button @click="showUsersModal = false" class="text-zinc-400 hover:text-zinc-200">✕</button>
+                <button @click="showUsersModal = false" class="text-zinc-400 hover:text-white">✕</button>
             </div>
 
-            <!-- Tab Switcher -->
-            <div class="flex items-center gap-2 border-b border-dark-800 pb-2">
-                <button @click="activeTab = 'users'"
-                        :class="activeTab === 'users' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
-                        class="px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5">
-                    <span>👥 Team Members</span>
-                    <span class="bg-dark-950 px-1.5 py-0.5 rounded text-[10px]" x-text="usersList.length"></span>
-                </button>
-                <button @click="activeTab = 'groups'"
-                        :class="activeTab === 'groups' ? 'bg-dark-800 text-brand-300 font-semibold' : 'text-zinc-400 hover:text-zinc-200'"
-                        class="px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5">
-                    <span>📁 Ecosystem Groups</span>
-                    <span class="bg-dark-950 px-1.5 py-0.5 rounded text-[10px]" x-text="groupsList.length"></span>
+            <!-- Subhead & Action -->
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Registered Team Members</span>
+                <button @click="showCreateUserModal = true"
+                        class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md">
+                    <span>＋</span>
+                    <span>Create User</span>
                 </button>
             </div>
 
-            <!-- TAB 1: USERS -->
-            <div x-show="activeTab === 'users'" class="flex-1 flex flex-col gap-4 overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Registered Team Members</span>
-                    <button @click="showCreateUserModal = true"
-                            class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
-                        <span>＋</span>
-                        <span>Create User</span>
-                    </button>
-                </div>
-
-                <div class="flex-1 overflow-y-auto border border-dark-800 rounded-xl bg-dark-950 divide-y divide-dark-800">
-                    <template x-for="u in usersList" :key="u.id">
-                        <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                            <div class="flex flex-col gap-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-semibold text-zinc-100" x-text="u.name"></span>
-                                    <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded"
-                                          :class="u.role === 'admin' ? 'bg-purple-900/40 text-purple-300 border border-purple-700/50' : 'bg-zinc-800 text-zinc-300'"
-                                          x-text="u.role === 'admin' ? 'Global Admin' : 'Member'"></span>
-                                    <span x-show="!u.is_active" class="bg-rose-950 text-rose-400 px-1.5 py-0.5 rounded text-[10px]">Deactivated</span>
-                                </div>
-                                <span class="text-zinc-400 font-mono text-[11px]" x-text="u.email"></span>
-                                
-                                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                    <span class="text-[11px] text-zinc-500">Access:</span>
-                                    <template x-if="u.role === 'admin'">
-                                        <span class="bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2 py-0.5 rounded text-[10px] font-medium">
-                                            ⚡ All Projects & Ecosystems (Full Admin)
-                                        </span>
-                                    </template>
-                                    <template x-if="u.role !== 'admin'">
-                                        <div class="flex flex-wrap gap-1">
-                                            <template x-for="p in u.assigned_projects" :key="p.project_id">
-                                                <span class="bg-dark-850 border border-dark-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] flex items-center gap-1.5">
-                                                    <span x-text="p.group_name ? `${p.group_name} / ${p.project_name}` : p.project_name"></span>
-                                                    <span class="text-[9px] uppercase px-1 rounded font-bold"
-                                                          :class="{
-                                                              'bg-rose-950 text-rose-300': p.role === 'admin',
-                                                              'bg-emerald-950 text-emerald-300': p.role === 'editor',
-                                                              'bg-blue-950 text-blue-300': p.role === 'viewer'
-                                                          }"
-                                                          x-text="p.role"></span>
-                                                </span>
-                                            </template>
-                                            <template x-if="u.assigned_projects.length === 0">
-                                                <span class="text-zinc-600 italic text-[11px]">No projects assigned yet</span>
-                                            </template>
-                                        </div>
-                                    </template>
-                                </div>
+            <!-- Users List Table -->
+            <div class="flex-1 overflow-y-auto border border-dark-800 rounded-2xl bg-dark-950 divide-y divide-dark-800">
+                <template x-for="u in usersList" :key="u.id">
+                    <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold text-zinc-100" x-text="u.name"></span>
+                                <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded"
+                                      :class="u.role === 'admin' ? 'bg-purple-900/40 text-purple-300 border border-purple-700/50' : 'bg-zinc-800 text-zinc-300'"
+                                      x-text="u.role === 'admin' ? 'Global Admin' : 'Member'"></span>
+                                <span x-show="!u.is_active" class="bg-rose-950 text-rose-400 px-1.5 py-0.5 rounded text-[10px]">Deactivated</span>
                             </div>
-
-                            <div class="flex items-center gap-2 self-end sm:self-center">
-                                <button x-show="u.role !== 'admin'"
-                                        @click="openAssignModal(u)"
-                                        class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-brand-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                                    🔑 Assign Projects
-                                </button>
-                                <button @click="deleteVaultUser(u.id)"
-                                        class="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-2.5 py-1.5 rounded-lg text-xs transition-colors">
-                                    🗑️ Delete
-                                </button>
+                            <span class="text-zinc-400 font-mono text-[11px]" x-text="u.email"></span>
+                            
+                            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                <span class="text-[11px] text-zinc-500">Access:</span>
+                                <template x-if="u.role === 'admin'">
+                                    <span class="bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2 py-0.5 rounded text-[10px] font-medium">
+                                        ⚡ All Projects & Ecosystems (Full Admin)
+                                    </span>
+                                </template>
+                                <template x-if="u.role !== 'admin'">
+                                    <div class="flex flex-wrap gap-1">
+                                        <template x-for="p in u.assigned_projects" :key="p.project_id">
+                                            <span class="bg-dark-850 border border-dark-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] flex items-center gap-1.5">
+                                                <span x-text="p.group_name ? `${p.group_name} / ${p.project_name}` : p.project_name"></span>
+                                                <span class="text-[9px] uppercase px-1 rounded font-bold"
+                                                      :class="{
+                                                          'bg-rose-950 text-rose-300': p.role === 'admin',
+                                                          'bg-emerald-950 text-emerald-300': p.role === 'editor',
+                                                          'bg-blue-950 text-blue-300': p.role === 'viewer'
+                                                      }"
+                                                      x-text="p.role"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="u.assigned_projects.length === 0">
+                                            <span class="text-zinc-600 italic text-[11px]">No projects assigned yet</span>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
                         </div>
-                    </template>
-                    <template x-if="usersList.length === 0">
-                        <div class="p-8 text-center text-xs text-zinc-500">
-                            No team members registered yet.
-                        </div>
-                    </template>
-                </div>
-            </div>
 
-            <!-- TAB 2: ECOSYSTEM GROUPS -->
-            <div x-show="activeTab === 'groups'" class="flex-1 flex flex-col gap-4 overflow-hidden">
-                <!-- Create Group Inline Form -->
-                <form @submit.prevent="createEcosystemGroup(newGroupName, newGroupDesc); newGroupName = ''; newGroupDesc = '';"
-                      class="flex items-center gap-2 bg-dark-950 p-3 rounded-xl border border-dark-800 text-xs">
-                    <input type="text" x-model="newGroupName" required placeholder="New Ecosystem Name (e.g. Coffe, Logistics, FinTech)"
-                           class="flex-1 bg-dark-850 border border-dark-800 rounded-lg px-3 py-1.5 text-zinc-100 focus:outline-none focus:border-brand-500">
-                    <input type="text" x-model="newGroupDesc" placeholder="Description (optional)"
-                           class="flex-1 bg-dark-850 border border-dark-800 rounded-lg px-3 py-1.5 text-zinc-100 focus:outline-none focus:border-brand-500">
-                    <button type="submit"
-                            class="bg-brand-500 hover:bg-brand-600 text-white font-medium px-4 py-1.5 rounded-lg whitespace-nowrap">
-                        ＋ Add Ecosystem
-                    </button>
-                </form>
-
-                <div class="flex-1 overflow-y-auto border border-dark-800 rounded-xl bg-dark-950 divide-y divide-dark-800">
-                    <template x-for="g in groupsList" :key="g.id">
-                        <div class="p-3.5 flex items-center justify-between text-xs">
-                            <div class="flex items-center gap-3">
-                                <span class="text-base">📁</span>
-                                <div>
-                                    <div class="font-semibold text-zinc-100" x-text="g.name"></div>
-                                    <div class="text-[11px] text-zinc-500 font-mono" x-text="`slug: ${g.slug}`"></div>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <span class="bg-dark-850 border border-dark-800 px-2 py-0.5 rounded text-[11px] text-brand-300 font-medium"
-                                      x-text="`${g.projects_count} linked apps`"></span>
-                                <button @click="deleteEcosystemGroup(g.id)"
-                                        class="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-2.5 py-1 rounded text-xs transition-colors">
-                                    Delete
-                                </button>
-                            </div>
+                        <div class="flex items-center gap-2 self-end sm:self-center">
+                            <button x-show="u.role !== 'admin'"
+                                    @click="openAssignModal(u)"
+                                    class="bg-dark-850 hover:bg-dark-800 border border-dark-800 text-brand-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
+                                🔑 Assign Projects
+                            </button>
+                            <button @click="deleteVaultUser(u.id)"
+                                    class="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-2.5 py-1.5 rounded-xl text-xs transition-colors">
+                                🗑️ Delete
+                            </button>
                         </div>
-                    </template>
-                    <template x-if="groupsList.length === 0">
-                        <div class="p-8 text-center text-xs text-zinc-500">
-                            No ecosystems created yet.
-                        </div>
-                    </template>
-                </div>
+                    </div>
+                </template>
+                <template x-if="usersList.length === 0">
+                    <div class="p-8 text-center text-xs text-zinc-500">
+                        No team members registered yet.
+                    </div>
+                </template>
             </div>
         </div>
     </div>
 
-    <!-- Modal 5: Create User Modal -->
+    <!-- Modal 6: Ecosystem Groups Management Modal -->
+    <div x-show="showGroupsModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div @click.away="showGroupsModal = false"
+             class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl p-6 gap-5"
+             x-data="{ newGroupName: '', newGroupDesc: '' }">
+            <div class="flex items-center justify-between pb-3 border-b border-dark-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center text-sm font-bold">
+                        📁
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">Ecosystem Groups</h3>
+                        <p class="text-xs text-zinc-400">Cluster microservices together under parent ecosystems (e.g. Coffe, Logistics, Auth Hub)</p>
+                    </div>
+                </div>
+                <button @click="showGroupsModal = false" class="text-zinc-400 hover:text-white">✕</button>
+            </div>
+
+            <!-- Create Group Form -->
+            <form @submit.prevent="createEcosystemGroup(newGroupName, newGroupDesc); newGroupName = ''; newGroupDesc = '';"
+                  class="flex flex-col sm:flex-row items-center gap-2 bg-dark-950 p-3 rounded-2xl border border-dark-800 text-xs">
+                <input type="text" x-model="newGroupName" required placeholder="New Ecosystem Name (e.g. Coffe, Payments)"
+                       class="w-full sm:flex-1 bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-brand-500">
+                <input type="text" x-model="newGroupDesc" placeholder="Description (optional)"
+                       class="w-full sm:flex-1 bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-brand-500">
+                <button type="submit"
+                        class="w-full sm:w-auto bg-brand-500 hover:bg-brand-600 text-white font-semibold px-4 py-2 rounded-xl whitespace-nowrap shadow-md">
+                    ＋ Add Group
+                </button>
+            </form>
+
+            <div class="flex-1 overflow-y-auto border border-dark-800 rounded-2xl bg-dark-950 divide-y divide-dark-800">
+                <template x-for="g in groupsList" :key="g.id">
+                    <div class="p-3.5 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-3">
+                            <span class="text-base">📁</span>
+                            <div>
+                                <div class="font-semibold text-zinc-100" x-text="g.name"></div>
+                                <div class="text-[11px] text-zinc-500 font-mono" x-text="`slug: ${g.slug}`"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="bg-dark-850 border border-dark-800 px-2 py-0.5 rounded-lg text-[11px] text-brand-300 font-medium"
+                                  x-text="`${g.projects_count} linked apps`"></span>
+                            <button @click="deleteEcosystemGroup(g.id)"
+                                    class="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-2.5 py-1 rounded-lg text-xs transition-colors">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="groupsList.length === 0">
+                    <div class="p-8 text-center text-xs text-zinc-500">
+                        No ecosystems created yet. Add one above to group microservices!
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 7: Create User Modal -->
     <div x-show="showCreateUserModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div @click.away="showCreateUserModal = false"
              class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
             <h3 class="font-bold text-white text-base">Create Team Member</h3>
             <form @submit.prevent="createVaultUser" class="space-y-3.5">
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">Full Name</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Full Name</label>
                     <input type="text" x-model="newUserForm.name" required placeholder="e.g. John Doe"
-                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                           class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">Email / Username</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Email / Username</label>
                     <input type="email" x-model="newUserForm.email" required placeholder="john@example.com"
-                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                           class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">Initial Password</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Initial Password</label>
                     <input type="password" x-model="newUserForm.password" required placeholder="••••••••"
-                           class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                           class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-zinc-300 mb-1">System Role</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">System Role</label>
                     <select x-model="newUserForm.role"
-                            class="w-full bg-dark-850 border border-dark-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
+                            class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-brand-500">
                         <option value="user">Member (Scoped to assigned projects)</option>
                         <option value="admin">Administrator (Full global system access)</option>
                     </select>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" @click="showCreateUserModal = false" class="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white">Cancel</button>
-                    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-1.5 rounded-lg">Create</button>
+                    <button type="button" @click="showCreateUserModal = false" class="px-3 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-1.5 rounded-xl shadow-md">Create</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal 6: Assign Projects to User -->
+    <!-- Modal 8: Assign Projects to User -->
     <div x-show="showAssignModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div @click.away="showAssignModal = false"
              class="bg-dark-900 border border-dark-800 rounded-2xl w-full max-w-xl max-h-[85vh] flex flex-col p-6 gap-4 shadow-2xl">
@@ -766,13 +1089,13 @@
                     <h3 class="font-bold text-white text-base">Assign Project Access</h3>
                     <p class="text-xs text-zinc-400">Configure access permissions for <span class="text-brand-300 font-semibold" x-text="selectedUserForAssign ? selectedUserForAssign.name : ''"></span></p>
                 </div>
-                <button @click="showAssignModal = false" class="text-zinc-400 hover:text-zinc-200">✕</button>
+                <button @click="showAssignModal = false" class="text-zinc-400 hover:text-white">✕</button>
             </div>
 
             <!-- Project List with Role Pickers -->
             <div class="flex-1 overflow-y-auto space-y-2 max-h-96 pr-1">
                 <template x-for="p in projects" :key="p.id">
-                    <div class="bg-dark-950 border border-dark-800 p-3 rounded-xl flex items-center justify-between text-xs"
+                    <div class="bg-dark-950 border border-dark-800 p-3 rounded-2xl flex items-center justify-between text-xs"
                          x-data="{ currentRole: getAssignedRole(p.id) }">
                         <div>
                             <div class="font-semibold text-zinc-200" x-text="p.group_name ? `${p.group_name} / ${p.name}` : p.name"></div>
@@ -780,19 +1103,19 @@
                         </div>
                         <div class="flex items-center gap-2">
                             <select x-model="currentRole"
-                                    class="bg-dark-850 border border-dark-800 rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none">
+                                    class="bg-dark-850 border border-dark-800 rounded-xl px-2 py-1 text-xs text-zinc-200 focus:outline-none">
                                 <option value="editor">Editor (Read & Write secrets)</option>
                                 <option value="viewer">Viewer (Read-only)</option>
                                 <option value="admin">Project Admin (Full control)</option>
                             </select>
                             <template x-if="isProjectAssigned(p.id)">
                                 <button @click="removeProjectAssignment(p.id)"
-                                        class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded hover:bg-rose-950/30">
+                                        class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded-lg hover:bg-rose-950/30">
                                     Revoke
                                 </button>
                             </template>
                             <button @click="saveProjectAssignment(p.id, currentRole)"
-                                    class="bg-brand-500 hover:bg-brand-600 text-white text-xs px-2.5 py-1 rounded font-medium">
+                                    class="bg-brand-500 hover:bg-brand-600 text-white text-xs px-3 py-1 rounded-xl font-semibold shadow-sm">
                                 Save
                             </button>
                         </div>
@@ -801,7 +1124,7 @@
             </div>
 
             <div class="flex justify-end pt-2 border-t border-dark-800">
-                <button @click="showAssignModal = false" class="bg-dark-800 hover:bg-dark-700 text-white text-xs px-4 py-2 rounded-lg font-medium">Done</button>
+                <button @click="showAssignModal = false" class="bg-dark-800 hover:bg-dark-750 text-white text-xs px-4 py-2 rounded-xl font-semibold">Done</button>
             </div>
         </div>
     </div>
@@ -812,6 +1135,7 @@
 <script>
 function vaultApp() {
     return {
+        mobileSidebarOpen: false,
         projects: [],
         currentProject: null,
         environments: [],
@@ -823,12 +1147,15 @@ function vaultApp() {
         searchFilter: '',
         isDirty: false,
         isSaving: false,
+        allMasked: true,
 
         // Modals
         showTokensModal: false,
         showCreatedTokenModal: false,
+        showSnippetsModal: false,
         showNewProjectModal: false,
         showUsersModal: false,
+        showGroupsModal: false,
         showCreateUserModal: false,
         showAssignModal: false,
         newTokenName: '',
@@ -845,6 +1172,16 @@ function vaultApp() {
         newUserForm: { name: '', email: '', password: '', role: 'user' },
 
         async initApp() {
+            // Setup Ctrl/Cmd + S hotkey to save secrets
+            window.addEventListener('keydown', (e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                    e.preventDefault();
+                    if (this.isDirty && !this.isSaving && this.currentUserRoleInProject !== 'viewer') {
+                        this.saveSecrets();
+                    }
+                }
+            });
+
             await this.loadCurrentUser();
             await this.loadGroups();
             await this.loadProjects();
@@ -924,8 +1261,15 @@ function vaultApp() {
         },
 
         async selectEnvironment(env) {
-            if (this.isDirty && !confirm('You have unsaved changes. Discard and switch environment?')) {
-                return;
+            if (this.isDirty) {
+                const ok = await window.askConfirm({
+                    title: 'Discard Unsaved Changes?',
+                    message: 'You have unsaved changes in the current environment. Switching environments will discard them.',
+                    confirmText: 'Discard & Switch',
+                    cancelText: 'Keep Editing',
+                    isDanger: true
+                });
+                if (!ok) return;
             }
             this.currentEnv = env;
             this.isDirty = false;
@@ -948,6 +1292,7 @@ function vaultApp() {
                     comment: s.comment || '',
                     masked: true
                 }));
+                this.allMasked = true;
                 this.syncTableToRaw();
                 this.isDirty = false;
             } catch (e) {
@@ -967,7 +1312,7 @@ function vaultApp() {
         },
 
         addSecretRow() {
-            this.secrets.push({
+            this.secrets.unshift({
                 key: '',
                 value: '',
                 comment: '',
@@ -975,19 +1320,28 @@ function vaultApp() {
             });
             this.isDirty = true;
             this.syncTableToRaw();
+            this.toast('Added new variable row', 'info');
         },
 
         deleteSecretRow(index) {
             this.secrets.splice(index, 1);
             this.isDirty = true;
             this.syncTableToRaw();
+            this.toast('Variable removed', 'info');
+        },
+
+        toggleAllMask() {
+            this.allMasked = !this.allMasked;
+            for (const s of this.secrets) {
+                s.masked = this.allMasked;
+            }
+            this.toast(this.allMasked ? 'All secret values masked' : 'All secret values revealed', 'info');
         },
 
         async saveSecrets() {
             if (!this.currentEnv || this.isSaving) return;
             this.isSaving = true;
 
-            // If in raw mode, parse first
             if (this.viewMode === 'raw') {
                 this.syncRawToTable();
             }
@@ -1006,12 +1360,12 @@ function vaultApp() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (!res.ok) throw new Error('Save failed');
+                if (!res.ok) throw new Error('Failed to persist secrets');
                 this.isDirty = false;
-                this.toast('All secrets encrypted and saved successfully!', 'success');
+                this.toast('All secrets encrypted with AES-256-GCM & saved!', 'success', 'Saved Successfully');
                 await this.loadSecrets();
             } catch (e) {
-                this.toast('Failed to save secrets: ' + e.message, 'error');
+                this.toast('Failed to save secrets: ' + e.message, 'error', 'Save Error');
             } finally {
                 this.isSaving = false;
             }
@@ -1019,6 +1373,7 @@ function vaultApp() {
 
         discardChanges() {
             this.loadSecrets();
+            this.toast('Changes discarded', 'info');
         },
 
         syncTableToRaw() {
@@ -1081,12 +1436,21 @@ function vaultApp() {
             a.download = `${this.currentProject ? this.currentProject.slug : 'project'}.${this.currentEnv ? this.currentEnv.slug : 'env'}.env`;
             a.click();
             URL.revokeObjectURL(url);
-            this.toast('File downloaded!', 'info');
+            this.toast(`Exported ${a.download}`, 'success');
         },
 
         openTokensModal() {
             this.showTokensModal = true;
             this.loadTokens();
+        },
+
+        openSnippetsModal() {
+            this.showSnippetsModal = true;
+        },
+
+        openGroupsModal() {
+            this.showGroupsModal = true;
+            this.loadGroups();
         },
 
         async generateServiceToken() {
@@ -1107,6 +1471,7 @@ function vaultApp() {
                 this.showTokensModal = false;
                 this.showCreatedTokenModal = true;
                 this.newTokenName = '';
+                this.toast('New machine token generated!', 'success');
                 await this.loadTokens();
             } catch (e) {
                 this.toast('Token error: ' + e.message, 'error');
@@ -1114,13 +1479,21 @@ function vaultApp() {
         },
 
         async revokeToken(id) {
-            if (!confirm('Are you sure you want to revoke this service token?')) return;
+            const ok = await window.askConfirm({
+                title: 'Revoke Machine Service Token',
+                message: 'Are you sure you want to revoke this service token? Any active CI/CD pipelines, Docker containers, or CLI processes using it will immediately fail to authenticate.',
+                confirmText: 'Revoke Token',
+                cancelText: 'Cancel',
+                isDanger: true
+            });
+            if (!ok) return;
+
             try {
                 await fetch(`/api/tokens/${id}`, { method: 'DELETE' });
-                this.toast('Token revoked', 'info');
+                this.toast('Service token revoked permanently', 'info');
                 await this.loadTokens();
             } catch (e) {
-                this.toast('Failed to revoke token', 'error');
+                this.toast('Failed to revoke token: ' + e.message, 'error');
             }
         },
 
@@ -1161,7 +1534,7 @@ function vaultApp() {
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message || 'Failed to create ecosystem group');
-                this.toast('Ecosystem group created!', 'success');
+                this.toast('Ecosystem group created successfully!', 'success');
                 await this.loadGroups();
             } catch (e) {
                 this.toast('Error: ' + e.message, 'error');
@@ -1169,16 +1542,29 @@ function vaultApp() {
         },
 
         async deleteEcosystemGroup(id) {
-            if (!confirm('Are you sure you want to delete this ecosystem group? Linked projects will become standalone.')) return;
+            const ok = await window.askConfirm({
+                title: 'Delete Ecosystem Group',
+                message: 'Are you sure you want to delete this ecosystem group? All linked microservices will remain safe and become standalone.',
+                confirmText: 'Delete Group',
+                cancelText: 'Cancel',
+                isDanger: true
+            });
+            if (!ok) return;
+
             try {
                 const res = await fetch(`/api/groups/${id}`, { method: 'DELETE' });
                 if (!res.ok) throw new Error('Failed to delete ecosystem group');
-                this.toast('Ecosystem group deleted', 'info');
+                this.toast('Ecosystem group removed', 'info');
                 await this.loadGroups();
                 await this.loadProjects();
             } catch (e) {
                 this.toast('Error: ' + e.message, 'error');
             }
+        },
+
+        getGenericCurlSnippet() {
+            const host = window.location.origin;
+            return `curl -fsSL -H "Authorization: Bearer <EXAVAULT_TOKEN>" ${host}/api/v1/export > .env`;
         },
 
         getCurlFileSnippet() {
@@ -1244,6 +1630,7 @@ build_app:
 
         getMcpSnippet() {
             const host = window.location.origin;
+            const tokenVal = this.newlyCreatedToken || '<EXAVAULT_TOKEN>';
             return JSON.stringify({
                 "mcpServers": {
                     "exavault": {
@@ -1251,7 +1638,7 @@ build_app:
                         "args": ["mcp"],
                         "env": {
                             "EXAVAULT_URL": host,
-                            "EXAVAULT_TOKEN": this.newlyCreatedToken
+                            "EXAVAULT_TOKEN": tokenVal
                         }
                     }
                 }
@@ -1259,12 +1646,18 @@ build_app:
         },
 
         copyToClipboard(text, successMsg) {
+            if (!text) {
+                this.toast('Nothing to copy', 'warning');
+                return;
+            }
             navigator.clipboard.writeText(text);
             this.toast(successMsg, 'success');
         },
 
-        toast(msg, type = 'info') {
-            window.dispatchEvent(new CustomEvent('toast', { detail: { msg, type } }));
+        toast(msg, type = 'info', title = '') {
+            if (window.toast) {
+                window.toast(msg, type, title);
+            }
         },
 
         formatDate(iso) {
@@ -1311,11 +1704,19 @@ build_app:
         },
 
         async deleteVaultUser(id) {
-            if (!confirm('Are you sure you want to delete this user? All project assignments will be removed.')) return;
+            const ok = await window.askConfirm({
+                title: 'Delete Team Member',
+                message: 'Are you sure you want to delete this user? All their project assignments and credentials will be permanently removed.',
+                confirmText: 'Delete User',
+                cancelText: 'Cancel',
+                isDanger: true
+            });
+            if (!ok) return;
+
             try {
                 const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
                 if (!res.ok) throw new Error('Failed to delete user');
-                this.toast('User deleted', 'info');
+                this.toast('User deleted successfully', 'info');
                 await this.loadUsersList();
             } catch (e) {
                 this.toast('Error: ' + e.message, 'error');
@@ -1378,4 +1779,3 @@ build_app:
 }
 </script>
 {% endblock %}
-

@@ -22,3 +22,7 @@ logs/
 .vscode/
 *.swp
 *.swo
+
+# Kubernetes sensitive secrets
+**/secret.yaml
+!**/secret.example.yaml
