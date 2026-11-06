@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: exavault
-  labels:
-    app.kubernetes.io/name: exavault
-    app.kubernetes.io/part-of: exavault
