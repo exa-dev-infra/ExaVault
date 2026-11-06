@@ -140,7 +140,7 @@ async fn test_bulk_upsert_and_export_formats() {
     assert!(logs.iter().any(|l| l.action == "CREATE_TOKEN"), "Audit log for CREATE_TOKEN missing");
 
     // 3. Export in dotenv format
-    let (dotenv_out, content_type) = service.export_secrets(&token_resp.token, "dotenv").await.unwrap();
+    let (dotenv_out, content_type) = service.export_secrets(&token_resp.token, "dotenv", None, None).await.unwrap();
     assert_eq!(content_type, "text/plain; charset=utf-8");
     assert!(dotenv_out.contains("# Main DB"));
     assert!(dotenv_out.contains("DATABASE_URL=\"postgres://usr:p@ss@host:5432/db\""));
@@ -148,15 +148,19 @@ async fn test_bulk_upsert_and_export_formats() {
     assert!(dotenv_out.contains("MULTILINE_VAR=\"line1\\nline2\""));
 
     // 4. Export in shell format
-    let (shell_out, _) = service.export_secrets(&token_resp.token, "shell").await.unwrap();
+    let (shell_out, _) = service.export_secrets(&token_resp.token, "shell", None, None).await.unwrap();
     assert!(shell_out.contains("export DATABASE_URL=\"postgres://usr:p@ss@host:5432/db\""));
     assert!(shell_out.contains("export APP_NAME=\"My \\\"Quoted\\\" App\""));
 
     // 5. Export in JSON format
-    let (json_out, json_ct) = service.export_secrets(&token_resp.token, "json").await.unwrap();
+    let (json_out, json_ct) = service.export_secrets(&token_resp.token, "json", None, None).await.unwrap();
     assert_eq!(json_ct, "application/json; charset=utf-8");
     let json_val: serde_json::Value = serde_json::from_str(&json_out).unwrap();
     assert_eq!(json_val["APP_NAME"], "My \"Quoted\" App");
+
+    // Verify usage/export event was logged in audit trail
+    let logs_after_export = service.list_audit_logs(dev_env.id, Some(10)).await.expect("Failed to fetch audit logs");
+    assert!(logs_after_export.iter().any(|l| l.action == "EXPORT_SECRETS"), "Audit log for EXPORT_SECRETS missing");
 
     // 6. Test Cascading Delete
     service.delete_project(proj.project.id).await.unwrap();

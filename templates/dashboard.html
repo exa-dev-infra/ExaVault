@@ -1195,15 +1195,19 @@
                                           'bg-emerald-950 text-emerald-400 border border-emerald-800/50': log.action === 'SAVE_SECRETS',
                                           'bg-rose-950 text-rose-400 border border-rose-800/50': log.action === 'DELETE_SECRET',
                                           'bg-purple-950 text-purple-400 border border-purple-800/50': log.action === 'CREATE_TOKEN',
-                                          'bg-amber-950 text-amber-400 border border-amber-800/50': log.action === 'REVOKE_TOKEN'
+                                          'bg-amber-950 text-amber-400 border border-amber-800/50': log.action === 'REVOKE_TOKEN',
+                                          'bg-cyan-950 text-cyan-400 border border-cyan-800/50': log.action === 'EXPORT_SECRETS'
                                       }"
                                       x-text="log.action"></span>
                                 <span class="text-[11px] text-zinc-500 font-mono" x-text="formatDate(log.created_at)"></span>
                             </div>
                         </div>
 
-                        <!-- Summary -->
-                        <div class="text-zinc-300 pl-8" x-text="log.summary"></div>
+                        <!-- Summary & IP Metadata -->
+                        <div class="text-zinc-300 pl-8 flex items-center justify-between flex-wrap gap-2">
+                            <span x-text="log.summary"></span>
+                            <span x-show="log.ip_address" class="text-[10px] font-mono text-zinc-500 bg-dark-900 px-1.5 py-0.5 rounded border border-dark-800" x-text="`IP: ${log.ip_address}`"></span>
+                        </div>
 
                         <!-- Affected Keys Pills -->
                         <template x-if="log.affected_keys && log.affected_keys.length > 0">

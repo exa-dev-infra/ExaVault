@@ -301,11 +301,14 @@ impl VaultService {
     }
 
     /// Verifies Bearer service token and exports decrypted secrets in requested format.
+    /// Also records an audit log entry for the access/usage event.
     /// Returns (formatted_content, content_type)
     pub async fn export_secrets(
         &self,
         raw_token: &str,
         format: &str,
+        client_ip: Option<&str>,
+        user_agent: Option<&str>,
     ) -> Result<(String, &'static str), AppError> {
         let trimmed_token = raw_token.trim();
         if !trimmed_token.starts_with("exv_") {
@@ -316,7 +319,7 @@ impl VaultService {
         }
 
         let token_hash = hash_service_token(trimmed_token);
-        let (token, _env) = self.repo.find_token_by_hash(&token_hash).await?;
+        let (token, env) = self.repo.find_token_by_hash(&token_hash).await?;
 
         // Check expiration
         if let Some(exp) = token.expires_at {
@@ -330,6 +333,40 @@ impl VaultService {
 
         // Fetch & decrypt secrets
         let secrets = self.list_secrets_decrypted(token.environment_id).await?;
+        let affected_keys: Vec<String> = secrets.iter().map(|s| s.key.clone()).collect();
+
+        // Record Audit Log for usage / export
+        let actor_name = format!("Token: {}", token.name);
+        let actor_email = format!("{}...", token.token_prefix);
+        let summary = format!(
+            "Service token '{}' exported {} secrets from {} ({})",
+            token.name,
+            affected_keys.len(),
+            env.name,
+            env.slug
+        );
+
+        let details = serde_json::json!({
+            "token_id": token.id,
+            "token_name": token.name,
+            "token_prefix": token.token_prefix,
+            "export_format": format,
+            "user_agent": user_agent,
+            "secret_count": affected_keys.len(),
+        });
+
+        let _ = self.repo.record_audit_log(
+            token.environment_id,
+            Some(env.project_id),
+            None,
+            &actor_email,
+            &actor_name,
+            "EXPORT_SECRETS",
+            &summary,
+            &affected_keys,
+            details,
+            client_ip,
+        ).await;
 
         match format.to_lowercase().as_str() {
             "json" => {

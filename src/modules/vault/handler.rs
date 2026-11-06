@@ -449,7 +449,26 @@ pub async fn export_secrets_handler(
     let raw_token = &auth_header[7..];
     let format = query.format.unwrap_or_else(|| "dotenv".to_string());
 
-    let (content, content_type) = ctx.service.export_secrets(raw_token, &format).await?;
+    let client_ip = headers
+        .get("x-forwarded-for")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|h| h.to_str().ok())
+                .map(|s| s.trim())
+        });
+
+    let user_agent = headers
+        .get(header::USER_AGENT)
+        .and_then(|h| h.to_str().ok());
+
+    let (content, content_type) = ctx
+        .service
+        .export_secrets(raw_token, &format, client_ip, user_agent)
+        .await?;
 
     let response = Response::builder()
         .status(StatusCode::OK)
