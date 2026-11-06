@@ -28,6 +28,7 @@ pub fn vault_router(ctx: VaultContext) -> Router {
             get(list_tokens_handler).post(create_token_handler),
         )
         .route("/tokens/:id", delete(delete_token_handler))
+        .route("/environments/:env_id/audit-logs", get(list_audit_logs_handler))
         // Project Groups (Ecosystem) routes
         .route("/groups", get(list_groups_handler).post(create_group_handler))
         .route("/groups/:id", axum::routing::put(update_group_handler).delete(delete_group_handler))

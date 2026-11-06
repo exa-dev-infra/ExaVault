@@ -117,7 +117,7 @@ async fn test_bulk_upsert_and_export_formats() {
         },
     ];
 
-    service.bulk_upsert_secrets(dev_env.id, secrets).await.expect("Failed bulk upsert");
+    service.bulk_upsert_secrets(dev_env.id, secrets, None).await.expect("Failed bulk upsert");
 
     // 2. Create Service Token
     let token_resp = service
@@ -127,11 +127,17 @@ async fn test_bulk_upsert_and_export_formats() {
                 name: "Test Runner Token".to_string(),
                 expires_in_days: Some(30),
             },
+            None,
         )
         .await
         .expect("Failed to create token");
 
     assert!(token_resp.token.starts_with("exv_"));
+
+    // Verify audit logs were generated
+    let logs = service.list_audit_logs(dev_env.id, Some(10)).await.expect("Failed to fetch audit logs");
+    assert!(logs.iter().any(|l| l.action == "SAVE_SECRETS"), "Audit log for SAVE_SECRETS missing");
+    assert!(logs.iter().any(|l| l.action == "CREATE_TOKEN"), "Audit log for CREATE_TOKEN missing");
 
     // 3. Export in dotenv format
     let (dotenv_out, content_type) = service.export_secrets(&token_resp.token, "dotenv").await.unwrap();

@@ -268,7 +268,7 @@ pub async fn bulk_upsert_secrets_handler(
     Json(payload): Json<Vec<UpsertSecretItem>>,
 ) -> Result<impl IntoResponse, AppError> {
     ctx.service.check_env_permission(&user, env_id, "editor").await?;
-    ctx.service.bulk_upsert_secrets(env_id, payload).await?;
+    ctx.service.bulk_upsert_secrets(env_id, payload, Some(&user)).await?;
     Ok(BaseResponse::success(json!({}), "Secrets saved successfully"))
 }
 
@@ -281,7 +281,7 @@ pub async fn delete_secret_handler(
         let env_id = ctx.service.repository().get_secret_env_id(id).await?;
         ctx.service.check_env_permission(&user, env_id, "editor").await?;
     }
-    ctx.service.delete_secret(id).await?;
+    ctx.service.delete_secret(id, Some(&user)).await?;
     Ok(BaseResponse::success(json!({ "id": id }), "Secret deleted successfully"))
 }
 
@@ -306,7 +306,7 @@ pub async fn create_token_handler(
     Json(payload): Json<CreateServiceTokenRequest>,
 ) -> Result<(StatusCode, impl IntoResponse), AppError> {
     ctx.service.check_env_permission(&user, env_id, "editor").await?;
-    let token = ctx.service.create_service_token(env_id, payload).await?;
+    let token = ctx.service.create_service_token(env_id, payload, Some(&user)).await?;
     Ok((StatusCode::CREATED, BaseResponse::success(token, "Service token created")))
 }
 
@@ -319,8 +319,22 @@ pub async fn delete_token_handler(
         let env_id = ctx.service.repository().get_token_env_id(id).await?;
         ctx.service.check_env_permission(&user, env_id, "editor").await?;
     }
-    ctx.service.delete_token(id).await?;
+    ctx.service.delete_token(id, Some(&user)).await?;
     Ok(BaseResponse::success(json!({ "id": id }), "Service token revoked"))
+}
+
+// ---------------------------------------------------------------------------
+// Audit Logs Handler
+// ---------------------------------------------------------------------------
+
+pub async fn list_audit_logs_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Path(env_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    ctx.service.check_env_permission(&user, env_id, "read").await?;
+    let logs = ctx.service.list_audit_logs(env_id, Some(50)).await?;
+    Ok(BaseResponse::success(logs, "Audit logs retrieved"))
 }
 
 // ---------------------------------------------------------------------------

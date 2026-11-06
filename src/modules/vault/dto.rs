@@ -213,3 +213,19 @@ pub struct EnvironmentSecretsResponse {
     pub user_role: String, // "admin", "editor", "viewer"
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AuditLog {
+    pub id: Uuid,
+    pub environment_id: Uuid,
+    pub project_id: Option<Uuid>,
+    pub user_id: Option<Uuid>,
+    pub user_email: String,
+    pub user_name: String,
+    pub action: String,
+    pub summary: String,
+    pub affected_keys: Vec<String>,
+    pub details: serde_json::Value,
+    pub ip_address: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+

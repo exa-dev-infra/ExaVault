@@ -107,8 +107,11 @@ impl VaultService {
         &self,
         env_id: Uuid,
         items: Vec<UpsertSecretItem>,
+        user: Option<&VaultAuthUser>,
     ) -> Result<(), AppError> {
+        let env = self.repo.get_environment(env_id).await?;
         let mut encrypted_items = Vec::with_capacity(items.len());
+        let mut affected_keys = Vec::with_capacity(items.len());
 
         for item in items {
             let key = item.key.trim();
@@ -116,16 +119,78 @@ impl VaultService {
                 continue;
             }
 
+            affected_keys.push(key.to_string());
             // Generate unique 12-byte IV for every single secret write/update
             let (enc_val, iv, auth_tag) = encrypt_secret(&item.value, &self.master_key)?;
             encrypted_items.push((key.to_string(), enc_val, iv, auth_tag, item.comment));
         }
 
-        self.repo.bulk_upsert_secrets(env_id, encrypted_items).await
+        self.repo.bulk_upsert_secrets(env_id, encrypted_items).await?;
+
+        // Audit Trail Entry
+        let (u_id, u_email, u_name) = match user {
+            Some(u) => (Some(u.id), u.email.as_str(), u.username.as_str()),
+            None => (None, "system", "System / CLI"),
+        };
+
+        let summary = format!(
+            "Saved {} secret variables in {} ({})",
+            affected_keys.len(),
+            env.name,
+            env.slug
+        );
+
+        let details = serde_json::json!({
+            "count": affected_keys.len(),
+            "environment_slug": env.slug,
+            "environment_name": env.name,
+        });
+
+        let _ = self.repo.record_audit_log(
+            env_id,
+            Some(env.project_id),
+            u_id,
+            u_email,
+            u_name,
+            "SAVE_SECRETS",
+            &summary,
+            &affected_keys,
+            details,
+            None,
+        ).await;
+
+        Ok(())
     }
 
-    pub async fn delete_secret(&self, id: Uuid) -> Result<(), AppError> {
-        self.repo.delete_secret(id).await
+    pub async fn delete_secret(&self, id: Uuid, user: Option<&VaultAuthUser>) -> Result<(), AppError> {
+        let secret_details = self.repo.get_secret_details(id).await?;
+        self.repo.delete_secret(id).await?;
+
+        if let Some((env_id, key)) = secret_details {
+            let env = self.repo.get_environment(env_id).await.ok();
+            let (u_id, u_email, u_name) = match user {
+                Some(u) => (Some(u.id), u.email.as_str(), u.username.as_str()),
+                None => (None, "system", "System / CLI"),
+            };
+
+            let summary = format!("Deleted secret variable '{}'", key);
+            let details = serde_json::json!({ "deleted_key": key });
+
+            let _ = self.repo.record_audit_log(
+                env_id,
+                env.as_ref().map(|e| e.project_id),
+                u_id,
+                u_email,
+                u_name,
+                "DELETE_SECRET",
+                &summary,
+                &[key],
+                details,
+                None,
+            ).await;
+        }
+
+        Ok(())
     }
 
     pub async fn list_tokens(&self, env_id: Uuid) -> Result<Vec<ServiceTokenListItem>, AppError> {
@@ -136,6 +201,7 @@ impl VaultService {
         &self,
         env_id: Uuid,
         req: CreateServiceTokenRequest,
+        user: Option<&VaultAuthUser>,
     ) -> Result<NewServiceTokenResponse, AppError> {
         let name = req.name.trim();
         if name.is_empty() {
@@ -157,6 +223,32 @@ impl VaultService {
             .create_token(env_id, name, &token_prefix, &token_hash, expires_at)
             .await?;
 
+        let env = self.repo.get_environment(env_id).await.ok();
+        let (u_id, u_email, u_name) = match user {
+            Some(u) => (Some(u.id), u.email.as_str(), u.username.as_str()),
+            None => (None, "system", "System / CLI"),
+        };
+
+        let summary = format!("Generated service token '{}' ({})", token.name, token.token_prefix);
+        let details = serde_json::json!({
+            "token_name": token.name,
+            "token_prefix": token.token_prefix,
+            "expires_at": token.expires_at,
+        });
+
+        let _ = self.repo.record_audit_log(
+            env_id,
+            env.as_ref().map(|e| e.project_id),
+            u_id,
+            u_email,
+            u_name,
+            "CREATE_TOKEN",
+            &summary,
+            &[],
+            details,
+            None,
+        ).await;
+
         // Raw token is returned only once
         Ok(NewServiceTokenResponse {
             id: token.id,
@@ -169,8 +261,43 @@ impl VaultService {
         })
     }
 
-    pub async fn delete_token(&self, id: Uuid) -> Result<(), AppError> {
-        self.repo.delete_token(id).await
+    pub async fn delete_token(&self, id: Uuid, user: Option<&VaultAuthUser>) -> Result<(), AppError> {
+        let token_details = self.repo.get_token_details(id).await?;
+        self.repo.delete_token(id).await?;
+
+        if let Some((env_id, name, prefix)) = token_details {
+            let env = self.repo.get_environment(env_id).await.ok();
+            let (u_id, u_email, u_name) = match user {
+                Some(u) => (Some(u.id), u.email.as_str(), u.username.as_str()),
+                None => (None, "system", "System / CLI"),
+            };
+
+            let summary = format!("Revoked service token '{}' ({})", name, prefix);
+            let details = serde_json::json!({
+                "token_name": name,
+                "token_prefix": prefix,
+            });
+
+            let _ = self.repo.record_audit_log(
+                env_id,
+                env.as_ref().map(|e| e.project_id),
+                u_id,
+                u_email,
+                u_name,
+                "REVOKE_TOKEN",
+                &summary,
+                &[],
+                details,
+                None,
+            ).await;
+        }
+
+        Ok(())
+    }
+
+    pub async fn list_audit_logs(&self, env_id: Uuid, limit: Option<i64>) -> Result<Vec<AuditLog>, AppError> {
+        let limit = limit.unwrap_or(50).clamp(1, 200);
+        self.repo.list_audit_logs(env_id, limit).await
     }
 
     /// Verifies Bearer service token and exports decrypted secrets in requested format.

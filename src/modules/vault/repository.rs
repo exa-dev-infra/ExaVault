@@ -156,7 +156,9 @@ impl VaultRepository {
 
         let mut tx = self.pool.begin().await.map_err(AppError::Database)?;
 
+        let mut keys_to_keep = Vec::with_capacity(items.len());
         for (key, encrypted_val, iv, auth_tag, comment) in items {
+            keys_to_keep.push(key.clone());
             sqlx::query(
                 "INSERT INTO secrets (environment_id, key, encrypted_value, iv, auth_tag, comment, updated_at)
                  VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -176,6 +178,23 @@ impl VaultRepository {
             .execute(&mut *tx)
             .await
             .map_err(AppError::Database)?;
+        }
+
+        if !keys_to_keep.is_empty() {
+            sqlx::query(
+                "DELETE FROM secrets WHERE environment_id = $1 AND NOT (key = ANY($2))"
+            )
+            .bind(env_id)
+            .bind(&keys_to_keep)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::Database)?;
+        } else {
+            sqlx::query("DELETE FROM secrets WHERE environment_id = $1")
+                .bind(env_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::Database)?;
         }
 
         tx.commit().await.map_err(AppError::Database)?;
@@ -668,6 +687,86 @@ impl VaultRepository {
             return Err(AppError::not_found("Project group not found", "GROUP_NOT_FOUND"));
         }
         Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Audit Logging Queries
+    // -----------------------------------------------------------------------
+
+    pub async fn get_secret_details(&self, secret_id: Uuid) -> Result<Option<(Uuid, String)>, AppError> {
+        let row: Option<(Uuid, String)> = sqlx::query_as(
+            "SELECT environment_id, key FROM secrets WHERE id = $1"
+        )
+        .bind(secret_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(row)
+    }
+
+    pub async fn get_token_details(&self, token_id: Uuid) -> Result<Option<(Uuid, String, String)>, AppError> {
+        let row: Option<(Uuid, String, String)> = sqlx::query_as(
+            "SELECT environment_id, name, token_prefix FROM service_tokens WHERE id = $1"
+        )
+        .bind(token_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(row)
+    }
+
+    pub async fn record_audit_log(
+        &self,
+        env_id: Uuid,
+        project_id: Option<Uuid>,
+        user_id: Option<Uuid>,
+        user_email: &str,
+        user_name: &str,
+        action: &str,
+        summary: &str,
+        affected_keys: &[String],
+        details: serde_json::Value,
+        ip_address: Option<&str>,
+    ) -> Result<AuditLog, AppError> {
+        let row: AuditLog = sqlx::query_as(
+            "INSERT INTO audit_logs (environment_id, project_id, user_id, user_email, user_name, action, summary, affected_keys, details, ip_address, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+             RETURNING id, environment_id, project_id, user_id, user_email, user_name, action, summary, affected_keys, details, ip_address, created_at"
+        )
+        .bind(env_id)
+        .bind(project_id)
+        .bind(user_id)
+        .bind(user_email)
+        .bind(user_name)
+        .bind(action)
+        .bind(summary)
+        .bind(affected_keys)
+        .bind(details)
+        .bind(ip_address)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(row)
+    }
+
+    pub async fn list_audit_logs(&self, env_id: Uuid, limit: i64) -> Result<Vec<AuditLog>, AppError> {
+        let rows: Vec<AuditLog> = sqlx::query_as(
+            "SELECT id, environment_id, project_id, user_id, user_email, user_name, action, summary, affected_keys, details, ip_address, created_at
+             FROM audit_logs
+             WHERE environment_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2"
+        )
+        .bind(env_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(rows)
     }
 }
 
