@@ -52,6 +52,22 @@ impl VaultRepository {
         Ok(result)
     }
 
+    pub async fn get_project(&self, id: Uuid) -> Result<Project, AppError> {
+        let project: Project = sqlx::query_as(
+            "SELECT p.id, p.name, p.slug, p.description, p.group_id, g.name AS group_name, p.created_at
+             FROM projects p
+             LEFT JOIN project_groups g ON g.id = p.group_id
+             WHERE p.id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::not_found("Project not found", CODE_PROJECT_NOT_FOUND))?;
+
+        Ok(project)
+    }
+
     pub async fn create_project(
         &self,
         name: &str,
@@ -767,6 +783,93 @@ impl VaultRepository {
         .map_err(AppError::Database)?;
 
         Ok(rows)
+    }
+
+    pub async fn create_webhook(
+        &self,
+        project_id: Uuid,
+        environment_id: Option<Uuid>,
+        name: &str,
+        url: &str,
+        secret_token: Option<&str>,
+    ) -> Result<Webhook, AppError> {
+        let row: Webhook = sqlx::query_as(
+            "INSERT INTO webhooks (project_id, environment_id, name, url, secret_token)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, project_id, environment_id, name, url, secret_token, events, is_active, last_triggered_at, last_status_code, created_at, updated_at"
+        )
+        .bind(project_id)
+        .bind(environment_id)
+        .bind(name)
+        .bind(url)
+        .bind(secret_token)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(row)
+    }
+
+    pub async fn list_webhooks_by_project(&self, project_id: Uuid) -> Result<Vec<Webhook>, AppError> {
+        let rows: Vec<Webhook> = sqlx::query_as(
+            "SELECT id, project_id, environment_id, name, url, secret_token, events, is_active, last_triggered_at, last_status_code, created_at, updated_at
+             FROM webhooks
+             WHERE project_id = $1
+             ORDER BY created_at DESC"
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(rows)
+    }
+
+    pub async fn list_active_webhooks_for_env(
+        &self,
+        project_id: Uuid,
+        env_id: Uuid,
+    ) -> Result<Vec<Webhook>, AppError> {
+        let rows: Vec<Webhook> = sqlx::query_as(
+            "SELECT id, project_id, environment_id, name, url, secret_token, events, is_active, last_triggered_at, last_status_code, created_at, updated_at
+             FROM webhooks
+             WHERE project_id = $1
+               AND is_active = true
+               AND (environment_id IS NULL OR environment_id = $2)
+             ORDER BY created_at ASC"
+        )
+        .bind(project_id)
+        .bind(env_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(rows)
+    }
+
+    pub async fn delete_webhook(&self, id: Uuid) -> Result<(), AppError> {
+        sqlx::query("DELETE FROM webhooks WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+        Ok(())
+    }
+
+    pub async fn update_webhook_status(&self, id: Uuid, status_code: i32) -> Result<(), AppError> {
+        sqlx::query(
+            "UPDATE webhooks
+             SET last_triggered_at = NOW(), last_status_code = $1, updated_at = NOW()
+             WHERE id = $2"
+        )
+        .bind(status_code)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(())
     }
 }
 

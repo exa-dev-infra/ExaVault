@@ -373,3 +373,52 @@ async fn test_brand_assets_and_web_routes() {
     assert!(logo.contains("Vault"));
     assert!(logo.contains("CRYPTOGRAPHIC SECRET ENGINE"));
 }
+
+#[tokio::test]
+async fn test_webhook_crud_and_hmac_signature() {
+    let service = setup_test_context().await;
+
+    // 1. Test HMAC SHA-256 calculation
+    let secret = "my-shared-hmac-secret";
+    let payload_bytes = br#"{"event":"secrets_updated","project_slug":"backend"}"#;
+    let sig = exavault::pkg::crypto::compute_hmac_sha256(payload_bytes, secret);
+    assert!(sig.starts_with("sha256="));
+    assert_eq!(sig.len(), 7 + 64); // "sha256=" prefix (7) + 64 hex characters
+
+    // 2. Create a test project
+    let slug = format!("test-wh-{}", Utc::now().timestamp_micros());
+    let req = CreateProjectRequest {
+        name: "Webhook Test Project".to_string(),
+        slug: Some(slug.clone()),
+        description: Some("Project for webhook testing".to_string()),
+        group_id: None,
+        group_name: None,
+    };
+    let created = service.create_project(req).await.expect("Failed to create project");
+    let project_id = created.project.id;
+
+    // 3. Create Webhook
+    let wh_req = CreateWebhookRequest {
+        name: "ExaForge CI Sync".to_string(),
+        url: "https://exaforge.eka-dev.cloud/api/v1/webhooks/exavault".to_string(),
+        secret_token: Some("secret123".to_string()),
+        environment_id: None,
+    };
+    let webhook = service.create_webhook(project_id, wh_req).await.expect("Failed to create webhook");
+    assert_eq!(webhook.name, "ExaForge CI Sync");
+    assert_eq!(webhook.url, "https://exaforge.eka-dev.cloud/api/v1/webhooks/exavault");
+    assert_eq!(webhook.secret_token.as_deref(), Some("secret123"));
+
+    // 4. List webhooks
+    let list = service.list_webhooks(project_id).await.expect("Failed to list webhooks");
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0].id, webhook.id);
+
+    // 5. Delete webhook
+    service.delete_webhook(webhook.id).await.expect("Failed to delete webhook");
+    let list_after = service.list_webhooks(project_id).await.expect("Failed to list webhooks");
+    assert_eq!(list_after.len(), 0);
+
+    // Cleanup project
+    service.delete_project(project_id).await.unwrap();
+}

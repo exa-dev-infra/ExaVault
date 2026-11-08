@@ -159,6 +159,14 @@ impl VaultService {
             None,
         ).await;
 
+        self.dispatch_webhooks(
+            env.project_id,
+            env_id,
+            "secrets.updated",
+            affected_keys,
+            Vec::new(),
+        ).await;
+
         Ok(())
     }
 
@@ -184,10 +192,20 @@ impl VaultService {
                 u_name,
                 "DELETE_SECRET",
                 &summary,
-                &[key],
+                &[key.clone()],
                 details,
                 None,
             ).await;
+
+            if let Some(e) = env {
+                self.dispatch_webhooks(
+                    e.project_id,
+                    env_id,
+                    "secrets.updated",
+                    Vec::new(),
+                    vec![key],
+                ).await;
+            }
         }
 
         Ok(())
@@ -584,6 +602,120 @@ impl VaultService {
 
     pub async fn delete_group(&self, id: Uuid) -> Result<(), AppError> {
         self.repo.delete_group(id).await
+    }
+
+    pub async fn list_webhooks(&self, project_id: Uuid) -> Result<Vec<Webhook>, AppError> {
+        self.repo.list_webhooks_by_project(project_id).await
+    }
+
+    pub async fn create_webhook(&self, project_id: Uuid, req: CreateWebhookRequest) -> Result<Webhook, AppError> {
+        if req.name.trim().is_empty() {
+            return Err(AppError::bad_request("Webhook name is required", CODE_BAD_REQUEST));
+        }
+        if req.url.trim().is_empty() || (!req.url.starts_with("http://") && !req.url.starts_with("https://")) {
+            return Err(AppError::bad_request("Valid HTTP/HTTPS webhook URL is required", CODE_BAD_REQUEST));
+        }
+        self.repo.create_webhook(
+            project_id,
+            req.environment_id,
+            req.name.trim(),
+            req.url.trim(),
+            req.secret_token.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty()),
+        ).await
+    }
+
+    pub async fn delete_webhook(&self, id: Uuid) -> Result<(), AppError> {
+        self.repo.delete_webhook(id).await
+    }
+
+    pub async fn dispatch_webhooks(
+        &self,
+        project_id: Uuid,
+        env_id: Uuid,
+        event: &str,
+        changed_keys: Vec<String>,
+        deleted_keys: Vec<String>,
+    ) {
+        let webhooks = match self.repo.list_active_webhooks_for_env(project_id, env_id).await {
+            Ok(w) => w,
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to load active webhooks for env");
+                return;
+            }
+        };
+
+        if webhooks.is_empty() {
+            return;
+        }
+
+        let env = match self.repo.get_environment(env_id).await {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        let project = match self.repo.get_project(project_id).await {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        let payload = OutboundWebhookPayload {
+            event: event.to_string(),
+            timestamp: Utc::now(),
+            project_id,
+            project_slug: project.slug,
+            environment_id: env_id,
+            environment_slug: env.slug,
+            environment_name: env.name,
+            changed_keys,
+            deleted_keys,
+        };
+
+        let repo = self.repo.clone();
+        tokio::spawn(async move {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .unwrap_or_default();
+
+            let payload_bytes = match serde_json::to_vec(&payload) {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to serialize webhook payload");
+                    return;
+                }
+            };
+
+            for wh in webhooks {
+                let mut req = client.post(&wh.url)
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "ExaVault-Webhook/1.0")
+                    .header("X-ExaVault-Event", &payload.event);
+
+                if let Some(token) = &wh.secret_token {
+                    if !token.trim().is_empty() {
+                        let sig = crate::pkg::crypto::compute_hmac_sha256(&payload_bytes, token);
+                        req = req.header("X-ExaVault-Signature", sig);
+                        req = req.header("X-ExaVault-Secret", token.as_str());
+                    }
+                }
+
+                req = req.body(payload_bytes.clone());
+
+                let status_code = match req.send().await {
+                    Ok(res) => {
+                        let code = res.status().as_u16() as i32;
+                        tracing::info!(webhook_id = %wh.id, url = %wh.url, status = code, "Dispatched ExaVault webhook");
+                        code
+                    }
+                    Err(e) => {
+                        tracing::warn!(webhook_id = %wh.id, url = %wh.url, error = %e, "ExaVault webhook dispatch failed");
+                        0
+                    }
+                };
+
+                let _ = repo.update_webhook_status(wh.id, status_code).await;
+            }
+        });
     }
 }
 

@@ -229,3 +229,41 @@ pub struct AuditLog {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Webhook {
+    pub id: Uuid,
+    pub project_id: Uuid,
+    pub environment_id: Option<Uuid>,
+    pub name: String,
+    pub url: String,
+    pub secret_token: Option<String>,
+    pub events: serde_json::Value,
+    pub is_active: bool,
+    pub last_triggered_at: Option<DateTime<Utc>>,
+    pub last_status_code: Option<i32>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateWebhookRequest {
+    pub name: String,
+    pub url: String,
+    pub secret_token: Option<String>,
+    pub environment_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutboundWebhookPayload {
+    pub event: String,
+    pub timestamp: DateTime<Utc>,
+    pub project_id: Uuid,
+    pub project_slug: String,
+    pub environment_id: Uuid,
+    pub environment_slug: String,
+    pub environment_name: String,
+    pub changed_keys: Vec<String>,
+    pub deleted_keys: Vec<String>,
+}
+
+

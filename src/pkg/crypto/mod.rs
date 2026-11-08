@@ -4,12 +4,23 @@ use aes_gcm::{
 };
 use argon2::PasswordVerifier;
 use chrono::Utc;
+use hmac::Mac;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{constants::codes::CODE_UNAUTHORIZED, pkg::errors::AppError};
+
+type HmacSha256 = hmac::Hmac<Sha256>;
+
+/// Computes HMAC SHA-256 hex string for webhook payload signing.
+pub fn compute_hmac_sha256(payload: &[u8], secret: &str) -> String {
+    let mut mac = <HmacSha256 as Mac>::new_from_slice(secret.as_bytes())
+        .expect("HMAC supports keys of any size");
+    mac.update(payload);
+    format!("sha256={}", hex::encode(mac.finalize().into_bytes()))
+}
 
 /// Derives a consistent 32-byte AES-256 key from any input string.
 /// If valid 64-char hex, decodes to 32 bytes; otherwise hashes with SHA-256.

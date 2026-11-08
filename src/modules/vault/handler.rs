@@ -479,3 +479,33 @@ pub async fn export_secrets_handler(
     Ok(response)
 }
 
+pub async fn list_webhooks_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Path(project_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    ctx.service.check_project_permission(&user, project_id, "read").await?;
+    let webhooks = ctx.service.list_webhooks(project_id).await?;
+    Ok(BaseResponse::success(webhooks, "Webhooks retrieved successfully"))
+}
+
+pub async fn create_webhook_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Path(project_id): Path<Uuid>,
+    Json(payload): Json<CreateWebhookRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    ctx.service.check_project_permission(&user, project_id, "editor").await?;
+    let webhook = ctx.service.create_webhook(project_id, payload).await?;
+    Ok(BaseResponse::created(webhook, "Webhook created successfully"))
+}
+
+pub async fn delete_webhook_handler(
+    State(ctx): State<VaultContext>,
+    Extension(_user): Extension<VaultAuthUser>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    ctx.service.delete_webhook(id).await?;
+    Ok(BaseResponse::success(true, "Webhook deleted successfully"))
+}
+

@@ -1137,6 +1137,7 @@ dependencies = [
  "dotenvy",
  "futures-util",
  "hex",
+ "hmac",
  "jsonwebtoken",
  "lapin",
  "opentelemetry",
