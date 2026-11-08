@@ -1059,6 +1059,9 @@
                                             <span x-show="w.environment_id" class="text-[10px] bg-dark-800 text-brand-300 px-2 py-0.5 rounded-full font-mono">Scoped Env</span>
                                             <span x-show="!w.environment_id" class="text-[10px] bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded-full font-mono">All Envs</span>
                                             <span x-show="w.secret_token" class="text-[10px] bg-purple-950/60 border border-purple-800/60 text-purple-300 px-2 py-0.5 rounded-full font-mono">HMAC-Signed</span>
+                                            <template x-for="ev in (Array.isArray(w.events) ? w.events : [])" :key="ev">
+                                                <span class="text-[9px] bg-dark-950 border border-dark-800 text-zinc-400 font-mono px-1.5 py-0.2 rounded" x-text="ev"></span>
+                                            </template>
                                         </div>
                                         <div class="font-mono text-[11px] text-zinc-400 truncate max-w-lg" x-text="w.url"></div>
                                         <div class="flex items-center gap-3 text-[10px] text-zinc-500">
@@ -1069,29 +1072,48 @@
                                     </div>
                                 </div>
 
-                                <div class="flex items-center gap-3 self-end sm:self-center shrink-0">
+                                <div class="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+                                    <!-- Active / Paused Toggle -->
+                                    <button @click="toggleWebhookActive(w.id)"
+                                            class="px-2 py-1 rounded-lg text-[10px] font-bold font-mono transition-colors flex items-center gap-1 border"
+                                            :class="w.is_active ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-400 hover:bg-emerald-950/60' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:bg-zinc-850'"
+                                            :title="w.is_active ? 'Click to Pause Webhook' : 'Click to Enable Webhook'">
+                                        <span class="w-1.5 h-1.5 rounded-full" :class="w.is_active ? 'bg-emerald-400' : 'bg-zinc-500'"></span>
+                                        <span x-text="w.is_active ? 'ACTIVE' : 'PAUSED'"></span>
+                                    </button>
+
+                                    <!-- Test Ping Button -->
+                                    <button @click="testWebhook(w.id)"
+                                            :disabled="testingWebhookId === w.id"
+                                            class="px-2.5 py-1 rounded-lg bg-dark-800 hover:bg-dark-750 text-cyan-300 border border-dark-750 text-[11px] font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
+                                            title="Send Test Ping to verify subscriber response">
+                                        <span x-show="testingWebhookId !== w.id">⚡</span>
+                                        <span x-show="testingWebhookId === w.id" class="animate-spin text-[10px]">⏳</span>
+                                        <span>Ping</span>
+                                    </button>
+
                                     <div class="text-right">
                                         <template x-if="w.last_status_code && w.last_status_code >= 200 && w.last_status_code < 300">
-                                            <span class="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2.5 py-1 rounded-lg">
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-lg">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                                 <span x-text="`${w.last_status_code} OK`"></span>
                                             </span>
                                         </template>
                                         <template x-if="w.last_status_code && w.last_status_code >= 400">
-                                            <span class="inline-flex items-center gap-1 text-[11px] font-mono text-rose-400 bg-rose-950/40 border border-rose-800/40 px-2.5 py-1 rounded-lg" :title="w.last_error || 'Dispatch error'">
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-mono text-rose-400 bg-rose-950/40 border border-rose-800/40 px-2 py-0.5 rounded-lg" :title="w.last_error || 'Dispatch error'">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
                                                 <span x-text="`HTTP ${w.last_status_code}`"></span>
                                             </span>
                                         </template>
                                         <template x-if="!w.last_status_code">
-                                            <span class="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 bg-dark-850 px-2.5 py-1 rounded-lg">
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 bg-dark-850 px-2 py-0.5 rounded-lg">
                                                 <span>Idle</span>
                                             </span>
                                         </template>
                                     </div>
 
                                     <button @click="deleteWebhook(w.id)"
-                                            class="p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors"
+                                            class="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors"
                                             title="Delete Webhook">
                                         🗑️
                                     </button>
@@ -1602,6 +1624,29 @@
                 ExaVault will trigger an HTTP POST request to this URL whenever secrets in this project are modified or deleted.
             </p>
 
+            <!-- One-click Presets -->
+            <div>
+                <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Quick Integration Preset</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" @click="applyWebhookPreset('exaforge')"
+                            class="flex items-center gap-2.5 p-2.5 rounded-xl border border-dark-800 bg-dark-950 hover:bg-dark-850 hover:border-brand-500/40 text-left transition-colors">
+                        <span class="text-lg">🚀</span>
+                        <div>
+                            <div class="text-xs font-bold text-white">ExaForge CI/CD</div>
+                            <div class="text-[10px] text-zinc-500">Auto-sync secrets to pipelines</div>
+                        </div>
+                    </button>
+                    <button type="button" @click="applyWebhookPreset('custom')"
+                            class="flex items-center gap-2.5 p-2.5 rounded-xl border border-dark-800 bg-dark-950 hover:bg-dark-850 hover:border-zinc-700 text-left transition-colors">
+                        <span class="text-lg">⚡</span>
+                        <div>
+                            <div class="text-xs font-bold text-white">Custom Webhook</div>
+                            <div class="text-[10px] text-zinc-500">Custom HTTP POST endpoint</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
             <form @submit.prevent="submitCreateWebhook" class="space-y-3.5">
                 <div>
                     <label class="block text-xs font-semibold text-zinc-300 mb-1">Subscriber / System Name</label>
@@ -1613,6 +1658,21 @@
                     <label class="block text-xs font-semibold text-zinc-300 mb-1">Target Endpoint URL</label>
                     <input type="url" x-model="newWebhookUrl" required placeholder="https://exaforge.eka-dev.cloud/api/v1/webhooks/exavault"
                            class="w-full bg-dark-850 border border-dark-800 rounded-xl px-3 py-2 text-xs text-zinc-100 font-mono focus:outline-none focus:border-brand-500">
+                </div>
+
+                <!-- Event Triggers Selection -->
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1.5">Event Triggers</label>
+                    <div class="space-y-1.5 bg-dark-950 p-2.5 rounded-xl border border-dark-800">
+                        <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                            <input type="checkbox" value="secrets.updated" x-model="newWebhookEvents" class="rounded bg-dark-850 border-dark-800 text-brand-500 focus:ring-0">
+                            <span><code class="text-brand-300">secrets.updated</code> &mdash; When secrets are added or modified</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                            <input type="checkbox" value="secrets.deleted" x-model="newWebhookEvents" class="rounded bg-dark-850 border-dark-800 text-brand-500 focus:ring-0">
+                            <span><code class="text-rose-400">secrets.deleted</code> &mdash; When a secret key is removed</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div>
@@ -1684,7 +1744,9 @@ function vaultApp() {
         newWebhookUrl: '',
         newWebhookSecret: '',
         newWebhookEnvId: '',
+        newWebhookEvents: ['secrets.updated', 'secrets.deleted'],
         isSubmittingWebhook: false,
+        testingWebhookId: null,
 
         newTokenName: '',
         newTokenDays: '30',
@@ -2084,6 +2146,19 @@ function vaultApp() {
             }
         },
 
+        applyWebhookPreset(preset) {
+            if (preset === 'exaforge') {
+                this.newWebhookName = 'ExaForge CI/CD';
+                this.newWebhookUrl = 'https://exaforge.eka-dev.cloud/api/v1/webhooks/exavault';
+                this.newWebhookEvents = ['secrets.updated', 'secrets.deleted'];
+            } else if (preset === 'custom') {
+                this.newWebhookName = '';
+                this.newWebhookUrl = '';
+                this.newWebhookSecret = '';
+                this.newWebhookEvents = ['secrets.updated', 'secrets.deleted'];
+            }
+        },
+
         async submitCreateWebhook() {
             if (!this.currentProject) {
                 this.toast('Please select a project first', 'error');
@@ -2100,6 +2175,7 @@ function vaultApp() {
                     url: this.newWebhookUrl.trim(),
                     secret_token: this.newWebhookSecret.trim() || null,
                     environment_id: this.newWebhookEnvId ? this.newWebhookEnvId : null,
+                    events: this.newWebhookEvents.length > 0 ? this.newWebhookEvents : ['secrets.updated', 'secrets.deleted'],
                 };
                 const res = await fetch(`/api/projects/${this.currentProject.id}/webhooks`, {
                     method: 'POST',
@@ -2115,11 +2191,44 @@ function vaultApp() {
                 this.newWebhookUrl = '';
                 this.newWebhookSecret = '';
                 this.newWebhookEnvId = '';
+                this.newWebhookEvents = ['secrets.updated', 'secrets.deleted'];
                 await this.loadWebhooks();
             } catch (e) {
                 this.toast('Error registering webhook: ' + e.message, 'error');
             } finally {
                 this.isSubmittingWebhook = false;
+            }
+        },
+
+        async toggleWebhookActive(id) {
+            try {
+                const res = await fetch(`/api/webhooks/${id}/toggle`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Failed to toggle status');
+                this.toast(data.message || 'Webhook status updated', 'info');
+                await this.loadWebhooks();
+            } catch (e) {
+                this.toast('Failed to update status: ' + e.message, 'error');
+            }
+        },
+
+        async testWebhook(id) {
+            this.testingWebhookId = id;
+            try {
+                const res = await fetch(`/api/webhooks/${id}/test`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Test failed');
+                const testRes = data.data;
+                if (testRes.success) {
+                    this.toast(`✅ ${testRes.message} (${testRes.latency_ms}ms)`, 'success', 'Ping Successful');
+                } else {
+                    this.toast(`⚠️ ${testRes.message} (${testRes.latency_ms}ms)`, 'error', 'Ping Failed');
+                }
+                await this.loadWebhooks();
+            } catch (e) {
+                this.toast('Webhook test failed: ' + e.message, 'error', 'Test Error');
+            } finally {
+                this.testingWebhookId = null;
             }
         },
 

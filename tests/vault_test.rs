@@ -19,6 +19,7 @@ async fn setup_test_context() -> Arc<VaultService> {
 
     MIGRATED
         .get_or_init(|| async {
+            let _ = sqlx::query("DELETE FROM _sqlx_migrations WHERE version = 9").execute(&pool).await;
             run_migrations(&pool).await.expect("Failed migrations");
         })
         .await;
@@ -403,18 +404,25 @@ async fn test_webhook_crud_and_hmac_signature() {
         url: "https://exaforge.eka-dev.cloud/api/v1/webhooks/exavault".to_string(),
         secret_token: Some("secret123".to_string()),
         environment_id: None,
+        events: Some(vec!["secrets.updated".to_string(), "secrets.deleted".to_string()]),
     };
     let webhook = service.create_webhook(project_id, wh_req).await.expect("Failed to create webhook");
     assert_eq!(webhook.name, "ExaForge CI Sync");
     assert_eq!(webhook.url, "https://exaforge.eka-dev.cloud/api/v1/webhooks/exavault");
     assert_eq!(webhook.secret_token.as_deref(), Some("secret123"));
 
-    // 4. List webhooks
+    // 4. Test toggle active
+    let toggled = service.toggle_webhook_active(webhook.id).await.expect("Failed to toggle");
+    assert_eq!(toggled, false);
+    let toggled_back = service.toggle_webhook_active(webhook.id).await.expect("Failed to toggle back");
+    assert_eq!(toggled_back, true);
+
+    // 5. List webhooks
     let list = service.list_webhooks(project_id).await.expect("Failed to list webhooks");
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].id, webhook.id);
 
-    // 5. Delete webhook
+    // 6. Delete webhook
     service.delete_webhook(webhook.id).await.expect("Failed to delete webhook");
     let list_after = service.list_webhooks(project_id).await.expect("Failed to list webhooks");
     assert_eq!(list_after.len(), 0);

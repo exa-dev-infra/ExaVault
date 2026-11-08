@@ -32,6 +32,8 @@ pub fn vault_router(ctx: VaultContext) -> Router {
         // Webhooks & CI/CD Outbound Integration routes
         .route("/projects/:project_id/webhooks", get(list_webhooks_handler).post(create_webhook_handler))
         .route("/webhooks/:id", delete(delete_webhook_handler))
+        .route("/webhooks/:id/test", post(test_webhook_handler))
+        .route("/webhooks/:id/toggle", post(toggle_webhook_active_handler))
         // Project Groups (Ecosystem) routes
         .route("/groups", get(list_groups_handler).post(create_group_handler))
         .route("/groups/:id", axum::routing::put(update_group_handler).delete(delete_group_handler))

@@ -251,6 +251,15 @@ pub struct CreateWebhookRequest {
     pub url: String,
     pub secret_token: Option<String>,
     pub environment_id: Option<Uuid>,
+    pub events: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestWebhookResult {
+    pub status_code: i32,
+    pub latency_ms: u64,
+    pub success: bool,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

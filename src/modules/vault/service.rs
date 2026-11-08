@@ -615,17 +615,94 @@ impl VaultService {
         if req.url.trim().is_empty() || (!req.url.starts_with("http://") && !req.url.starts_with("https://")) {
             return Err(AppError::bad_request("Valid HTTP/HTTPS webhook URL is required", CODE_BAD_REQUEST));
         }
+
+        let events_val = match req.events {
+            Some(list) if !list.is_empty() => serde_json::to_value(list).unwrap_or_else(|_| serde_json::json!(["secrets.updated", "secrets.deleted"])),
+            _ => serde_json::json!(["secrets.updated", "secrets.deleted"]),
+        };
+
         self.repo.create_webhook(
             project_id,
             req.environment_id,
             req.name.trim(),
             req.url.trim(),
             req.secret_token.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty()),
+            events_val,
         ).await
     }
 
     pub async fn delete_webhook(&self, id: Uuid) -> Result<(), AppError> {
         self.repo.delete_webhook(id).await
+    }
+
+    pub async fn toggle_webhook_active(&self, id: Uuid) -> Result<bool, AppError> {
+        self.repo.toggle_webhook_active(id).await
+    }
+
+    pub async fn test_webhook(&self, id: Uuid) -> Result<TestWebhookResult, AppError> {
+        let wh = self.repo.get_webhook(id).await?;
+        let project = self.repo.get_project(wh.project_id).await?;
+
+        let test_payload = OutboundWebhookPayload {
+            event: "ping".to_string(),
+            timestamp: Utc::now(),
+            project_id: wh.project_id,
+            project_slug: project.slug,
+            environment_id: wh.environment_id.unwrap_or_default(),
+            environment_slug: "all".to_string(),
+            environment_name: "All Environments".to_string(),
+            changed_keys: vec!["PING_TEST".to_string()],
+            deleted_keys: vec![],
+        };
+
+        let payload_bytes = serde_json::to_vec(&test_payload)
+            .map_err(|e| AppError::internal(format!("Failed to serialize test payload: {}", e)))?;
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .unwrap_or_default();
+
+        let mut req = client.post(&wh.url)
+            .header("Content-Type", "application/json")
+            .header("User-Agent", "ExaVault-Webhook/1.0")
+            .header("X-ExaVault-Event", "ping");
+
+        if let Some(token) = &wh.secret_token {
+            if !token.trim().is_empty() {
+                let sig = crate::pkg::crypto::compute_hmac_sha256(&payload_bytes, token);
+                req = req.header("X-ExaVault-Signature", sig);
+                req = req.header("X-ExaVault-Secret", token.as_str());
+            }
+        }
+
+        req = req.body(payload_bytes);
+
+        let start = std::time::Instant::now();
+        let (status_code, success, message) = match req.send().await {
+            Ok(res) => {
+                let code = res.status().as_u16() as i32;
+                let is_ok = res.status().is_success();
+                let text = res.text().await.unwrap_or_default();
+                let snippet = if text.len() > 100 { format!("{}...", &text[..100]) } else { text };
+                (code, is_ok, if is_ok { format!("HTTP {}: Subscriber acknowledged ping", code) } else { format!("HTTP {}: {}", code, snippet) })
+            }
+            Err(e) => {
+                (0, false, format!("Connection failed: {}", e))
+            }
+        };
+        let latency_ms = start.elapsed().as_millis() as u64;
+
+        if status_code > 0 {
+            let _ = self.repo.update_webhook_status(wh.id, status_code).await;
+        }
+
+        Ok(TestWebhookResult {
+            status_code,
+            latency_ms,
+            success,
+            message,
+        })
     }
 
     pub async fn dispatch_webhooks(
@@ -686,6 +763,17 @@ impl VaultService {
             };
 
             for wh in webhooks {
+                // Event filtering check
+                let matches_event = match wh.events.as_array() {
+                    Some(arr) => arr.iter().any(|v| {
+                        v.as_str().map(|s| s == "*" || s == payload.event).unwrap_or(false)
+                    }),
+                    None => true,
+                };
+                if !matches_event {
+                    continue;
+                }
+
                 let mut req = client.post(&wh.url)
                     .header("Content-Type", "application/json")
                     .header("User-Agent", "ExaVault-Webhook/1.0")

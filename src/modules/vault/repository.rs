@@ -792,10 +792,11 @@ impl VaultRepository {
         name: &str,
         url: &str,
         secret_token: Option<&str>,
+        events: serde_json::Value,
     ) -> Result<Webhook, AppError> {
         let row: Webhook = sqlx::query_as(
-            "INSERT INTO webhooks (project_id, environment_id, name, url, secret_token)
-             VALUES ($1, $2, $3, $4, $5)
+            "INSERT INTO webhooks (project_id, environment_id, name, url, secret_token, events)
+             VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id, project_id, environment_id, name, url, secret_token, events, is_active, last_triggered_at, last_status_code, created_at, updated_at"
         )
         .bind(project_id)
@@ -803,11 +804,43 @@ impl VaultRepository {
         .bind(name)
         .bind(url)
         .bind(secret_token)
+        .bind(events)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::Database)?;
 
         Ok(row)
+    }
+
+    pub async fn get_webhook(&self, id: Uuid) -> Result<Webhook, AppError> {
+        let row: Webhook = sqlx::query_as(
+            "SELECT id, project_id, environment_id, name, url, secret_token, events, is_active, last_triggered_at, last_status_code, created_at, updated_at
+             FROM webhooks
+             WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::not_found("Webhook not found", "WEBHOOK_NOT_FOUND"))?;
+
+        Ok(row)
+    }
+
+    pub async fn toggle_webhook_active(&self, id: Uuid) -> Result<bool, AppError> {
+        let is_active: bool = sqlx::query_scalar(
+            "UPDATE webhooks
+             SET is_active = NOT is_active, updated_at = NOW()
+             WHERE id = $1
+             RETURNING is_active"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::not_found("Webhook not found", "WEBHOOK_NOT_FOUND"))?;
+
+        Ok(is_active)
     }
 
     pub async fn list_webhooks_by_project(&self, project_id: Uuid) -> Result<Vec<Webhook>, AppError> {

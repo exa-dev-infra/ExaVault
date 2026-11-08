@@ -509,3 +509,24 @@ pub async fn delete_webhook_handler(
     Ok(BaseResponse::success(true, "Webhook deleted successfully"))
 }
 
+pub async fn test_webhook_handler(
+    State(ctx): State<VaultContext>,
+    Extension(_user): Extension<VaultAuthUser>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    let result = ctx.service.test_webhook(id).await?;
+    Ok(BaseResponse::success(result, "Webhook ping test completed"))
+}
+
+pub async fn toggle_webhook_active_handler(
+    State(ctx): State<VaultContext>,
+    Extension(_user): Extension<VaultAuthUser>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    let is_active = ctx.service.toggle_webhook_active(id).await?;
+    Ok(BaseResponse::success(
+        json!({ "is_active": is_active }),
+        if is_active { "Webhook enabled" } else { "Webhook paused" },
+    ))
+}
+
