@@ -443,3 +443,55 @@ async fn test_webhook_crud_and_hmac_signature() {
     // Cleanup project
     service.delete_project(project_id).await.unwrap();
 }
+
+#[tokio::test]
+async fn test_auto_seed_admin_idempotency_and_auth() {
+    let service = setup_test_context().await;
+
+    // 1. Ensure initial admin is seeded if absent
+    let _seeded = service
+        .seed_default_admin("admin", "adminsecret123")
+        .await
+        .expect("Failed to run seed_default_admin");
+
+    assert!(service.has_any_admin().await.unwrap());
+
+    // 2. Subsequent runs of seed_default_admin MUST be idempotent and never overwrite existing admin
+    let second_seed = service
+        .seed_default_admin("admin", "completely-different-password")
+        .await
+        .expect("Idempotent seed check failed");
+    assert!(!second_seed, "Should not seed again when an admin already exists");
+
+    // 3. Test creating a dedicated admin user, authenticating, updating password, and cleanup
+    let ts = Utc::now().timestamp_micros();
+    let admin_name = format!("sec_admin_{}", ts);
+    let admin_email = format!("sec_admin_{}@test.local", ts);
+    let created_admin = service
+        .create_user(CreateVaultUserRequest {
+            name: admin_name.clone(),
+            email: admin_email.clone(),
+            password: "InitialAdminPass123!".to_string(),
+            role: Some("admin".to_string()),
+        })
+        .await
+        .expect("Failed to create test admin");
+
+    assert_eq!(created_admin.role, "admin");
+
+    // Authenticate by username AND email
+    assert!(service.authenticate_user(&admin_name, "InitialAdminPass123!").await.unwrap().is_some());
+    assert!(service.authenticate_user(&admin_email, "InitialAdminPass123!").await.unwrap().is_some());
+
+    // Update password in DB and verify old password fails while new password succeeds
+    let new_hash = exavault::pkg::auth::password::hash_password("UpdatedAdminPass999!").unwrap();
+    service.update_user_password(created_admin.id, &new_hash).await.unwrap();
+
+    assert!(service.authenticate_user(&admin_name, "InitialAdminPass123!").await.unwrap().is_none());
+    let reauthed = service.authenticate_user(&admin_name, "UpdatedAdminPass999!").await.unwrap().unwrap();
+    assert_eq!(reauthed.id, created_admin.id);
+    assert_eq!(reauthed.role, "admin");
+
+    // Cleanup test admin
+    service.delete_user(created_admin.id).await.unwrap();
+}

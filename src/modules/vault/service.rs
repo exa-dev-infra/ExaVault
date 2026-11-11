@@ -516,8 +516,51 @@ impl VaultService {
         self.repo.find_user_by_id(id).await
     }
 
+    pub async fn get_user_by_identifier(&self, identifier: &str) -> Result<Option<(Uuid, String, String, String, String, bool)>, AppError> {
+        self.repo.find_user_by_identifier(identifier).await
+    }
+
     pub async fn update_user_password(&self, id: Uuid, password_hash: &str) -> Result<(), AppError> {
         self.repo.update_user_password(id, password_hash).await
+    }
+
+    pub async fn count_admins(&self) -> Result<i64, AppError> {
+        self.repo.count_admins().await
+    }
+
+    pub async fn has_any_admin(&self) -> Result<bool, AppError> {
+        Ok(self.repo.count_admins().await? > 0)
+    }
+
+    /// Auto-seeds the initial administrator account into the database if no admin exists yet.
+    /// Returns `Ok(true)` if a new admin record was inserted, or `Ok(false)` if an admin already exists.
+    pub async fn seed_default_admin(&self, username: &str, raw_password_or_hash: &str) -> Result<bool, AppError> {
+        if self.repo.count_admins().await? > 0 {
+            return Ok(false);
+        }
+
+        let trimmed_username = username.trim();
+        let (name, email) = if trimmed_username.contains('@') {
+            let prefix = trimmed_username.split('@').next().unwrap_or("admin").trim();
+            (
+                if prefix.is_empty() { "admin".to_string() } else { prefix.to_string() },
+                trimmed_username.to_string(),
+            )
+        } else {
+            let clean_name = if trimmed_username.is_empty() { "admin" } else { trimmed_username };
+            (
+                clean_name.to_string(),
+                format!("{}@exavault.local", clean_name),
+            )
+        };
+
+        let password_hash = if raw_password_or_hash.starts_with("$argon2") {
+            raw_password_or_hash.to_string()
+        } else {
+            crate::pkg::auth::password::hash_password(raw_password_or_hash)?
+        };
+
+        self.repo.insert_seeded_admin(&name, &email, &password_hash).await
     }
 
     pub async fn list_users(&self) -> Result<Vec<UserSummary>, AppError> {

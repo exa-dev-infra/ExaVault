@@ -459,6 +459,38 @@ impl VaultRepository {
         Ok(())
     }
 
+    pub async fn count_admins(&self) -> Result<i64, AppError> {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM users WHERE role = 'admin'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(count)
+    }
+
+    pub async fn insert_seeded_admin(
+        &self,
+        name: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<bool, AppError> {
+        let res = sqlx::query(
+            "INSERT INTO users (name, email, password, role, is_active)
+             VALUES ($1, $2, $3, 'admin', true)
+             ON CONFLICT (email) DO NOTHING"
+        )
+        .bind(name)
+        .bind(email)
+        .bind(password_hash)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(res.rows_affected() > 0)
+    }
+
     pub async fn list_users_with_projects(&self) -> Result<Vec<UserSummary>, AppError> {
         let users: Vec<(Uuid, String, String, String, bool, DateTime<Utc>)> = sqlx::query_as(
             "SELECT id, name, email, role, is_active, created_at FROM users ORDER BY created_at ASC"

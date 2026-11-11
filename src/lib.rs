@@ -167,7 +167,7 @@ pub fn build_app(config: AppConfig, pool: PgPool, hub: Arc<RealtimeHub>) -> Rout
     let vault_ctx = VaultContext {
         service: vault_service.clone(),
         admin_username: config.admin_username.clone(),
-        admin_password: Arc::new(tokio::sync::RwLock::new(config.admin_password.clone())),
+        admin_password: config.admin_password.clone(),
         jwt_secret: config.jwt_secret.clone(),
     };
 

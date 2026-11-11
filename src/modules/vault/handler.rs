@@ -25,7 +25,7 @@ use crate::{
 pub struct VaultContext {
     pub service: Arc<VaultService>,
     pub admin_username: String,
-    pub admin_password: Arc<tokio::sync::RwLock<String>>,
+    pub admin_password: String,
     pub jwt_secret: String,
 }
 
@@ -84,25 +84,41 @@ pub async fn login_handler(
     jar: CookieJar,
     Json(payload): Json<LoginRequest>,
 ) -> Result<(CookieJar, impl IntoResponse), AppError> {
-    let admin_pw = ctx.admin_password.read().await;
-    let (auth_user, username) = if payload.username == ctx.admin_username
-        && verify_admin_password(&payload.password, &admin_pw)
+    let auth_user = if let Some(user) = ctx
+        .service
+        .authenticate_user(&payload.username, &payload.password)
+        .await?
     {
-        (
-            VaultAuthUser {
-                id: Uuid::nil(),
-                username: payload.username.clone(),
-                email: "admin@exavault.local".to_string(),
-                role: "admin".to_string(),
-            },
-            payload.username,
-        )
-    } else if let Some(user) = ctx.service.authenticate_user(&payload.username, &payload.password).await? {
-        let name = user.username.clone();
-        (user, name)
+        user
+    } else if !ctx.service.has_any_admin().await? {
+        // Auto-seed fallback ONLY when the database has zero admins
+        if (payload.username == ctx.admin_username
+            || payload.username == format!("{}@exavault.local", ctx.admin_username))
+            && verify_admin_password(&payload.password, &ctx.admin_password)
+        {
+            ctx.service
+                .seed_default_admin(&ctx.admin_username, &ctx.admin_password)
+                .await?;
+            ctx.service
+                .authenticate_user(&payload.username, &payload.password)
+                .await?
+                .ok_or_else(|| {
+                    AppError::unauthorized("Invalid username or password", CODE_INVALID_CREDENTIALS)
+                })?
+        } else {
+            return Err(AppError::unauthorized(
+                "Invalid username or password",
+                CODE_INVALID_CREDENTIALS,
+            ));
+        }
     } else {
-        return Err(AppError::unauthorized("Invalid username or password", CODE_INVALID_CREDENTIALS));
+        return Err(AppError::unauthorized(
+            "Invalid username or password",
+            CODE_INVALID_CREDENTIALS,
+        ));
     };
+
+    let username = auth_user.username.clone();
 
     let token = create_jwt(
         &auth_user.id.to_string(),
@@ -171,47 +187,14 @@ pub async fn change_password_handler(
         ));
     }
 
-    if user.id == Uuid::nil() {
-        // Admin Utama (Static / Global Admin)
-        let mut admin_pw_lock = ctx.admin_password.write().await;
-        if !verify_admin_password(&payload.current_password, &admin_pw_lock) {
-            return Err(AppError::bad_request(
-                "Current password is incorrect",
-                CODE_INVALID_CREDENTIALS,
-            ));
-        }
-
-        *admin_pw_lock = new_pw.to_string();
-
-        // Update .env file agar password baru tersimpan permanen
-        if let Ok(env_content) = std::fs::read_to_string(".env") {
-            let mut updated_lines = Vec::new();
-            let mut found = false;
-            for line in env_content.lines() {
-                if line.starts_with("ADMIN_PASSWORD=") {
-                    updated_lines.push(format!("ADMIN_PASSWORD={}", new_pw));
-                    found = true;
-                } else {
-                    updated_lines.push(line.to_string());
-                }
-            }
-            if !found {
-                updated_lines.push(format!("ADMIN_PASSWORD={}", new_pw));
-            }
-            let _ = std::fs::write(".env", updated_lines.join("\n") + "\n");
-        }
-
-        Ok(BaseResponse::ok_msg("Password updated successfully"))
+    let db_user_opt = if user.id != Uuid::nil() {
+        ctx.service.get_user_by_id(user.id).await?
     } else {
-        // Anggota Tim (Database User)
-        let db_user = ctx
-            .service
-            .get_user_by_id(user.id)
-            .await?
-            .ok_or_else(|| AppError::not_found("User account not found", CODE_NOT_FOUND))?;
+        ctx.service.get_user_by_identifier(&user.username).await?
+    };
 
-        let stored_hash = &db_user.3; // index 3 is password hash
-        if !crate::pkg::auth::password::verify_password(&payload.current_password, stored_hash)
+    if let Some((target_id, _, _, stored_hash, _, _)) = db_user_opt {
+        if !crate::pkg::auth::password::verify_password(&payload.current_password, &stored_hash)
             .unwrap_or(false)
         {
             return Err(AppError::bad_request(
@@ -221,8 +204,18 @@ pub async fn change_password_handler(
         }
 
         let new_hash = crate::pkg::auth::password::hash_password(new_pw)?;
-        ctx.service.update_user_password(user.id, &new_hash).await?;
+        ctx.service.update_user_password(target_id, &new_hash).await?;
 
+        Ok(BaseResponse::ok_msg("Password updated successfully"))
+    } else {
+        // Handle legacy session before seeding existed: verify env password then auto-seed with new password
+        if !verify_admin_password(&payload.current_password, &ctx.admin_password) {
+            return Err(AppError::bad_request(
+                "Current password is incorrect",
+                CODE_INVALID_CREDENTIALS,
+            ));
+        }
+        ctx.service.seed_default_admin(&ctx.admin_username, new_pw).await?;
         Ok(BaseResponse::ok_msg("Password updated successfully"))
     }
 }
@@ -490,6 +483,20 @@ pub async fn delete_user_handler(
 ) -> Result<impl IntoResponse, AppError> {
     if user.role != "admin" {
         return Err(AppError::forbidden("Admin privileges required", CODE_FORBIDDEN));
+    }
+    if id == user.id {
+        return Err(AppError::bad_request(
+            "You cannot delete your own active account",
+            CODE_VALIDATION_ERROR,
+        ));
+    }
+    if let Some(target_user) = ctx.service.get_user_by_id(id).await? {
+        if target_user.4 == "admin" && ctx.service.count_admins().await? <= 1 {
+            return Err(AppError::bad_request(
+                "Cannot delete the last remaining administrator account",
+                CODE_VALIDATION_ERROR,
+            ));
+        }
     }
     ctx.service.delete_user(id).await?;
     Ok(BaseResponse::success(json!({ "id": id }), "User deleted successfully"))

@@ -1198,6 +1198,10 @@
                                         <div class="w-7 h-7 rounded-full bg-brand-500/20 text-brand-300 font-bold flex items-center justify-center text-[11px]"
                                              x-text="(u.name || 'U').substring(0, 2).toUpperCase()"></div>
                                         <span class="font-bold text-zinc-100 text-sm" x-text="u.name"></span>
+                                        <span x-show="u.id === currentUser.id"
+                                              class="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+                                            Akun Aktif
+                                        </span>
                                         <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
                                               :class="u.role === 'admin' ? 'bg-purple-900/40 text-purple-300 border border-purple-700/50' : 'bg-dark-800 text-zinc-300'"
                                               x-text="u.role === 'admin' ? 'Global Admin' : 'Member'"></span>
@@ -1247,7 +1251,8 @@
                                         <span>🔑</span>
                                         <span>Assign Projects</span>
                                     </button>
-                                    <button @click="deleteVaultUser(u.id)"
+                                    <button x-show="u.id !== currentUser.id"
+                                            @click="deleteVaultUser(u.id)"
                                             class="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors">
                                         🗑️ Delete
                                     </button>
@@ -2648,7 +2653,10 @@ build_app:
 
             try {
                 const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed to delete user');
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.message || 'Failed to delete user');
+                }
                 this.toast('User deleted successfully', 'info');
                 await this.loadUsersList();
             } catch (e) {

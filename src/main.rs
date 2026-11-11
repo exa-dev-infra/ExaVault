@@ -93,6 +93,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         info!("Database migrations executed successfully");
                     }
+
+                    // Auto-seed initial administrator account into database if none exists
+                    let vault_repo = Arc::new(exavault::modules::vault::repository::VaultRepository::new(pool.clone()));
+                    let vault_service = exavault::modules::vault::service::VaultService::new(
+                        vault_repo,
+                        config.master_key_bytes(),
+                    );
+                    match vault_service.seed_default_admin(&config.admin_username, &config.admin_password).await {
+                        Ok(true) => info!(username = %config.admin_username, "Auto-seeded initial administrator account into database"),
+                        Ok(false) => info!("Administrator account already exists in database, skipping auto-seed"),
+                        Err(e) => tracing::warn!(error = %e, "Failed to auto-seed initial administrator account"),
+                    }
+
                     pool
                 }
                 Err(err) => {
