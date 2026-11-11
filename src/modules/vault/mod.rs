@@ -16,6 +16,7 @@ pub fn vault_router(ctx: VaultContext) -> Router {
     let protected_routes = Router::new()
         .route("/auth/me", get(me_handler))
         .route("/auth/logout", post(logout_handler))
+        .route("/auth/change-password", post(change_password_handler))
         .route("/projects", get(list_projects_handler).post(create_project_handler))
         .route("/projects/:id", delete(delete_project_handler))
         .route(
@@ -40,6 +41,7 @@ pub fn vault_router(ctx: VaultContext) -> Router {
         // User Management & RBAC routes
         .route("/users", get(list_users_handler).post(create_user_handler))
         .route("/users/:id", axum::routing::put(update_user_handler).delete(delete_user_handler))
+        .route("/users/:id/reset-password", post(reset_member_password_handler))
         .route("/users/:id/projects", post(assign_user_project_handler))
         .route("/users/:id/projects/:project_id", delete(remove_user_project_handler))
         .layer(from_fn_with_state(ctx.clone(), require_admin_auth));

@@ -275,4 +275,16 @@ pub struct OutboundWebhookPayload {
     pub deleted_keys: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResetMemberPasswordRequest {
+    pub new_password: String,
+}
+
+
 

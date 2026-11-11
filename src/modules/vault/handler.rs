@@ -25,7 +25,7 @@ use crate::{
 pub struct VaultContext {
     pub service: Arc<VaultService>,
     pub admin_username: String,
-    pub admin_password: String,
+    pub admin_password: Arc<tokio::sync::RwLock<String>>,
     pub jwt_secret: String,
 }
 
@@ -84,8 +84,9 @@ pub async fn login_handler(
     jar: CookieJar,
     Json(payload): Json<LoginRequest>,
 ) -> Result<(CookieJar, impl IntoResponse), AppError> {
+    let admin_pw = ctx.admin_password.read().await;
     let (auth_user, username) = if payload.username == ctx.admin_username
-        && verify_admin_password(&payload.password, &ctx.admin_password)
+        && verify_admin_password(&payload.password, &admin_pw)
     {
         (
             VaultAuthUser {
@@ -155,6 +156,75 @@ pub async fn logout_handler(jar: CookieJar) -> (CookieJar, impl IntoResponse) {
     let updated_jar = jar.add(cookie);
 
     (updated_jar, BaseResponse::success(json!({}), "Logged out successfully"))
+}
+
+pub async fn change_password_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Json(payload): Json<VaultChangePasswordRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let new_pw = payload.new_password.trim();
+    if new_pw.len() < 6 {
+        return Err(AppError::bad_request(
+            "New password must be at least 6 characters",
+            CODE_VALIDATION_ERROR,
+        ));
+    }
+
+    if user.id == Uuid::nil() {
+        // Admin Utama (Static / Global Admin)
+        let mut admin_pw_lock = ctx.admin_password.write().await;
+        if !verify_admin_password(&payload.current_password, &admin_pw_lock) {
+            return Err(AppError::bad_request(
+                "Current password is incorrect",
+                CODE_INVALID_CREDENTIALS,
+            ));
+        }
+
+        *admin_pw_lock = new_pw.to_string();
+
+        // Update .env file agar password baru tersimpan permanen
+        if let Ok(env_content) = std::fs::read_to_string(".env") {
+            let mut updated_lines = Vec::new();
+            let mut found = false;
+            for line in env_content.lines() {
+                if line.starts_with("ADMIN_PASSWORD=") {
+                    updated_lines.push(format!("ADMIN_PASSWORD={}", new_pw));
+                    found = true;
+                } else {
+                    updated_lines.push(line.to_string());
+                }
+            }
+            if !found {
+                updated_lines.push(format!("ADMIN_PASSWORD={}", new_pw));
+            }
+            let _ = std::fs::write(".env", updated_lines.join("\n") + "\n");
+        }
+
+        Ok(BaseResponse::ok_msg("Password updated successfully"))
+    } else {
+        // Anggota Tim (Database User)
+        let db_user = ctx
+            .service
+            .get_user_by_id(user.id)
+            .await?
+            .ok_or_else(|| AppError::not_found("User account not found", CODE_NOT_FOUND))?;
+
+        let stored_hash = &db_user.3; // index 3 is password hash
+        if !crate::pkg::auth::password::verify_password(&payload.current_password, stored_hash)
+            .unwrap_or(false)
+        {
+            return Err(AppError::bad_request(
+                "Current password is incorrect",
+                CODE_INVALID_CREDENTIALS,
+            ));
+        }
+
+        let new_hash = crate::pkg::auth::password::hash_password(new_pw)?;
+        ctx.service.update_user_password(user.id, &new_hash).await?;
+
+        Ok(BaseResponse::ok_msg("Password updated successfully"))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -375,6 +445,42 @@ pub async fn update_user_handler(
     }
     ctx.service.update_user(id, payload).await?;
     Ok(BaseResponse::success(json!({ "id": id }), "User updated successfully"))
+}
+
+pub async fn reset_member_password_handler(
+    State(ctx): State<VaultContext>,
+    Extension(user): Extension<VaultAuthUser>,
+    Path(target_id): Path<Uuid>,
+    Json(payload): Json<ResetMemberPasswordRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    if user.role != "admin" {
+        return Err(AppError::forbidden(
+            "Admin privileges required to reset member passwords",
+            CODE_FORBIDDEN,
+        ));
+    }
+
+    let new_pw = payload.new_password.trim();
+    if new_pw.len() < 6 {
+        return Err(AppError::bad_request(
+            "New password must be at least 6 characters",
+            CODE_VALIDATION_ERROR,
+        ));
+    }
+
+    let target_user = ctx
+        .service
+        .get_user_by_id(target_id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Team member not found", CODE_NOT_FOUND))?;
+
+    let new_hash = crate::pkg::auth::password::hash_password(new_pw)?;
+    ctx.service.update_user_password(target_id, &new_hash).await?;
+
+    Ok(BaseResponse::ok_msg(format!(
+        "Password for '{}' has been reset successfully",
+        target_user.1
+    )))
 }
 
 pub async fn delete_user_handler(

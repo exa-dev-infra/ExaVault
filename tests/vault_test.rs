@@ -275,7 +275,20 @@ async fn test_user_management_and_project_rbac() {
     let admin_p2_perm = service.check_project_permission(&admin_user, p2.project.id, "admin").await;
     assert!(admin_p2_perm.is_ok());
 
-    // 8. Delete user & verify project cleanup
+    // 8. Test password update and verification
+    let fetched_user = service.get_user_by_id(created_user.id).await.unwrap();
+    assert!(fetched_user.is_some());
+
+    let new_password_hash = exavault::pkg::auth::password::hash_password("NewSecretPass456!").unwrap();
+    service.update_user_password(created_user.id, &new_password_hash).await.unwrap();
+
+    let old_auth = service.authenticate_user(&user_email, "DevPassword123!").await.unwrap();
+    assert!(old_auth.is_none(), "Old password should no longer work");
+
+    let new_auth = service.authenticate_user(&user_email, "NewSecretPass456!").await.unwrap();
+    assert!(new_auth.is_some(), "New password should authenticate successfully");
+
+    // 9. Delete user & verify project cleanup
     service.delete_user(created_user.id).await.unwrap();
     service.delete_project(p1.project.id).await.unwrap();
     service.delete_project(p2.project.id).await.unwrap();

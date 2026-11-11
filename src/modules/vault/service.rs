@@ -512,6 +512,14 @@ impl VaultService {
         Ok(None)
     }
 
+    pub async fn get_user_by_id(&self, id: Uuid) -> Result<Option<(Uuid, String, String, String, String, bool)>, AppError> {
+        self.repo.find_user_by_id(id).await
+    }
+
+    pub async fn update_user_password(&self, id: Uuid, password_hash: &str) -> Result<(), AppError> {
+        self.repo.update_user_password(id, password_hash).await
+    }
+
     pub async fn list_users(&self) -> Result<Vec<UserSummary>, AppError> {
         self.repo.list_users_with_projects().await
     }

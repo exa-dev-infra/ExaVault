@@ -437,6 +437,28 @@ impl VaultRepository {
         Ok(row)
     }
 
+    pub async fn find_user_by_id(&self, id: Uuid) -> Result<Option<(Uuid, String, String, String, String, bool)>, AppError> {
+        let row: Option<(Uuid, String, String, String, String, bool)> = sqlx::query_as(
+            "SELECT id, name, email, password, role, is_active FROM users WHERE id = $1 LIMIT 1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(row)
+    }
+
+    pub async fn update_user_password(&self, id: Uuid, password_hash: &str) -> Result<(), AppError> {
+        sqlx::query("UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2")
+            .bind(password_hash)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+        Ok(())
+    }
+
     pub async fn list_users_with_projects(&self) -> Result<Vec<UserSummary>, AppError> {
         let users: Vec<(Uuid, String, String, String, bool, DateTime<Utc>)> = sqlx::query_as(
             "SELECT id, name, email, role, is_active, created_at FROM users ORDER BY created_at ASC"
